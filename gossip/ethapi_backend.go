@@ -567,29 +567,34 @@ func (b *EthAPIBackend) GetStakers(ctx context.Context) ([]sfctype.SfcStakerAndI
 	return stakers, nil
 }
 
-// GetDelegatorsOf returns SFC delegators who delegated to a staker
-func (b *EthAPIBackend) GetDelegatorsOf(ctx context.Context, stakerID idx.StakerID) ([]sfctype.SfcDelegatorAndAddr, error) {
+// GetDelegationsOf returns SFC delegators who delegated to a staker
+func (b *EthAPIBackend) GetDelegationsOf(ctx context.Context, stakerID idx.StakerID) ([]sfctype.SfcDelegationAndID, error) {
 	b.svc.engineMu.RLock() // lock because of iteration
 	defer b.svc.engineMu.RUnlock()
 
-	delegators := make([]sfctype.SfcDelegatorAndAddr, 0, 200)
+	delegators := make([]sfctype.SfcDelegationAndID, 0, 200)
 	// TODO add additional DB index
-	b.svc.app.ForEachSfcDelegator(func(it sfctype.SfcDelegatorAndAddr) {
-		if it.Delegator.ToStakerID == stakerID {
+	b.svc.app.ForEachSfcDelegation(func(it sfctype.SfcDelegationAndID) {
+		if it.ID.StakerID == stakerID {
 			delegators = append(delegators, it)
 		}
 	})
 	return delegators, nil
 }
 
-// GetDelegator returns SFC delegator info
-func (b *EthAPIBackend) GetDelegator(ctx context.Context, addr common.Address) (*sfctype.SfcDelegator, error) {
-	return b.svc.app.GetSfcDelegator(addr), nil
+// GetDelegation returns SFC delegation info
+func (b *EthAPIBackend) GetDelegation(ctx context.Context, id sfctype.DelegatorID) (*sfctype.SfcDelegation, error) {
+	return b.svc.app.GetSfcDelegation(id), nil
 }
 
-// GetDelegatorClaimedRewards returns sum of claimed rewards in past, by this delegator
-func (b *EthAPIBackend) GetDelegatorClaimedRewards(ctx context.Context, addr common.Address) (*big.Int, error) {
-	return b.svc.app.GetDelegatorClaimedRewards(addr), nil
+// GetDelegations returns SFC delegations info by address
+func (b *EthAPIBackend) GetDelegations(ctx context.Context, addr common.Address) ([]sfctype.SfcDelegationAndID, error) {
+	return b.svc.app.GetSfcDelegationsByAddr(addr, 1000), nil
+}
+
+// GetDelegationClaimedRewards returns sum of claimed rewards in past, by this delegator
+func (b *EthAPIBackend) GetDelegationClaimedRewards(ctx context.Context, id sfctype.DelegatorID) (*big.Int, error) {
+	return b.svc.app.GetDelegationClaimedRewards(id), nil
 }
 
 // GetStakerClaimedRewards returns sum of claimed rewards in past, by this staker
@@ -597,9 +602,9 @@ func (b *EthAPIBackend) GetStakerClaimedRewards(ctx context.Context, stakerID id
 	return b.svc.app.GetStakerClaimedRewards(stakerID), nil
 }
 
-// GetStakerDelegatorsClaimedRewards returns sum of claimed rewards in past, by this delegators of this staker
-func (b *EthAPIBackend) GetStakerDelegatorsClaimedRewards(ctx context.Context, stakerID idx.StakerID) (*big.Int, error) {
-	return b.svc.app.GetStakerDelegatorsClaimedRewards(stakerID), nil
+// GetStakerDelegationsClaimedRewards returns sum of claimed rewards in past, by this delegators of this staker
+func (b *EthAPIBackend) GetStakerDelegationsClaimedRewards(ctx context.Context, stakerID idx.StakerID) (*big.Int, error) {
+	return b.svc.app.GetStakerDelegationsClaimedRewards(stakerID), nil
 }
 
 // GetEventTime returns estimation of when event was created

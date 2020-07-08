@@ -41,9 +41,9 @@ func (s *Service) delAllStakerData(stakerID idx.StakerID) {
 	s.app.DelStakerDelegatorsClaimedRewards(stakerID)
 }
 
-func (s *Service) delAllDelegatorData(address common.Address) {
-	s.app.DelSfcDelegator(address)
-	s.app.DelDelegatorClaimedRewards(address)
+func (s *Service) delAllDelegatorData(id sfctype.DelegatorID) {
+	s.app.DelSfcDelegation(id)
+	s.app.DelDelegatorClaimedRewards(id)
 }
 
 var (
@@ -174,8 +174,7 @@ func (s *Service) processSfc(block *inter.Block, receipts types.Receipts, blockF
 				}
 				staker.DelegatedMe.Add(staker.DelegatedMe, amount)
 
-				s.app.SetSfcDelegator(address, &sfctype.SfcDelegator{
-					ToStakerID:   toStakerID,
+				s.app.SetSfcDelegation(sfctype.DelegatorID{address, toStakerID}, &sfctype.SfcDelegation{
 					CreatedEpoch: epoch,
 					CreatedTime:  block.Time,
 					Amount:       amount,
@@ -194,21 +193,23 @@ func (s *Service) processSfc(block *inter.Block, receipts types.Receipts, blockF
 			}
 
 			// Deactivate delegators
-			if (l.Topics[0] == sfcpos.Topics.DeactivatedDelegation || l.Topics[0] == sfcpos.Topics.PreparedToWithdrawDelegation) && len(l.Topics) > 1 {
+			if (l.Topics[0] == sfcpos.Topics.DeactivatedDelegation || l.Topics[0] == sfcpos.Topics.PreparedToWithdrawDelegation) && len(l.Topics) > 2 {
 				address := common.BytesToAddress(l.Topics[1][12:])
+				stakerID := idx.StakerID(new(big.Int).SetBytes(l.Topics[2][:]).Uint64())
+				id := sfctype.DelegatorID{address, stakerID}
 
-				delegator := s.app.GetSfcDelegator(address)
-				staker := s.app.GetSfcStaker(delegator.ToStakerID)
+				delegator := s.app.GetSfcDelegation(id)
+				staker := s.app.GetSfcStaker(stakerID)
 				if staker != nil {
 					staker.DelegatedMe.Sub(staker.DelegatedMe, delegator.Amount)
 					if staker.DelegatedMe.Sign() < 0 {
 						staker.DelegatedMe = big.NewInt(0)
 					}
-					s.app.SetSfcStaker(delegator.ToStakerID, staker)
+					s.app.SetSfcStaker(stakerID, staker)
 				}
 				delegator.DeactivatedEpoch = epoch
 				delegator.DeactivatedTime = block.Time
-				s.app.SetSfcDelegator(address, delegator)
+				s.app.SetSfcDelegation(id, delegator)
 			}
 
 			// Update stake
@@ -230,17 +231,20 @@ func (s *Service) processSfc(block *inter.Block, receipts types.Receipts, blockF
 			// Update delegation
 			if l.Topics[0] == sfcpos.Topics.UpdatedDelegation && len(l.Topics) > 3 && len(l.Data) >= 32 {
 				address := common.BytesToAddress(l.Topics[1][12:])
+				oldStakerID := idx.StakerID(new(big.Int).SetBytes(l.Topics[3][:]).Uint64())
 				newStakerID := idx.StakerID(new(big.Int).SetBytes(l.Topics[3][:]).Uint64())
 				newAmount := new(big.Int).SetBytes(l.Data[0:32])
+				oldId := sfctype.DelegatorID{address, oldStakerID}
+				newId := sfctype.DelegatorID{address, newStakerID}
 
-				delegator := s.app.GetSfcDelegator(address)
+				delegator := s.app.GetSfcDelegation(oldId)
 				if delegator == nil {
 					s.Log.Warn("Internal SFC index isn't synced with SFC contract")
 					continue
 				}
 				delegator.Amount = newAmount
-				delegator.ToStakerID = newStakerID
-				s.app.SetSfcDelegator(address, delegator)
+				s.app.DelSfcDelegation(oldId)
+				s.app.SetSfcDelegation(newId, delegator)
 			}
 
 			// Delete stakes
@@ -250,9 +254,10 @@ func (s *Service) processSfc(block *inter.Block, receipts types.Receipts, blockF
 			}
 
 			// Delete delegators
-			if l.Topics[0] == sfcpos.Topics.WithdrawnDelegation && len(l.Topics) > 1 {
+			if l.Topics[0] == sfcpos.Topics.WithdrawnDelegation && len(l.Topics) > 2 {
 				address := common.BytesToAddress(l.Topics[1][12:])
-				s.delAllDelegatorData(address)
+				stakerID := idx.StakerID(new(big.Int).SetBytes(l.Topics[2][:]).Uint64())
+				s.delAllDelegatorData(sfctype.DelegatorID{address, stakerID})
 			}
 
 			// Track changes of constants by SFC
@@ -283,7 +288,7 @@ func (s *Service) processSfc(block *inter.Block, receipts types.Receipts, blockF
 				stakerID := idx.StakerID(new(big.Int).SetBytes(l.Topics[2][:]).Uint64())
 				reward := new(big.Int).SetBytes(l.Data[0:32])
 
-				s.app.IncDelegatorClaimedRewards(address, reward)
+				s.app.IncDelegatorClaimedRewards(sfctype.DelegatorID{address, stakerID}, reward)
 				s.app.IncStakerDelegatorsClaimedRewards(stakerID, reward)
 			}
 		}

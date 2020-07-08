@@ -18,6 +18,11 @@ var (
 	CheaterMask = ForkBit
 )
 
+const (
+	// DelegatorIDSize is size of DelegatorID serialized object
+	DelegatorIDSize = 32 + 4
+)
+
 // SfcStaker is the node-side representation of SFC staker
 type SfcStaker struct {
 	CreatedEpoch idx.Epoch
@@ -67,8 +72,8 @@ func (s *SfcStaker) CalcTotalStake() *big.Int {
 	return new(big.Int).Add(s.StakeAmount, s.DelegatedMe)
 }
 
-// SfcDelegator is the node-side representation of SFC delegator
-type SfcDelegator struct {
+// SfcDelegation is the node-side representation of SFC delegator
+type SfcDelegation struct {
 	CreatedEpoch idx.Epoch
 	CreatedTime  inter.Timestamp
 
@@ -76,14 +81,31 @@ type SfcDelegator struct {
 	DeactivatedTime  inter.Timestamp
 
 	Amount *big.Int
-
-	ToStakerID idx.StakerID
 }
 
-// SfcDelegatorAndAddr is pair SfcDelegator + address
-type SfcDelegatorAndAddr struct {
-	Delegator *SfcDelegator
-	Addr      common.Address
+// DelegatorID is a pair of delegator address and staker ID to which delegation is applied
+type DelegatorID struct {
+	Delegator common.Address
+	StakerID  idx.StakerID
+}
+
+func (id *DelegatorID) Bytes() []byte {
+	return append(id.Delegator.Bytes(), id.StakerID.Bytes()...)
+}
+
+func BytesToDelegatorID(bb []byte) DelegatorID {
+	if len(bb) < DelegatorIDSize {
+		panic("delegator ID deserialization failed, consider upgrading DB")
+	}
+	delegator := common.BytesToAddress(bb[:32])
+	stakerID := idx.BytesToStakerID(bb[32:])
+	return DelegatorID{delegator, stakerID}
+}
+
+// SfcDelegationAndID is pair SfcDelegation + address
+type SfcDelegationAndID struct {
+	Delegator *SfcDelegation
+	ID        DelegatorID
 }
 
 // EpochStats stores general statistics for an epoch

@@ -3,9 +3,8 @@ package app
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
+	"github.com/Fantom-foundation/go-lachesis/inter/sfctype"
 )
 
 // GetStakerClaimedRewards returns sum of claimed rewards in past, by this staker
@@ -43,9 +42,9 @@ func (s *Store) DelStakerClaimedRewards(stakerID idx.StakerID) {
 	}
 }
 
-// GetDelegatorClaimedRewards returns sum of claimed rewards in past, by this delegator
-func (s *Store) GetDelegatorClaimedRewards(addr common.Address) *big.Int {
-	amount, err := s.table.DelegatorOldRewards.Get(addr.Bytes())
+// GetDelegationClaimedRewards returns sum of claimed rewards in past, by this delegator
+func (s *Store) GetDelegationClaimedRewards(id sfctype.DelegatorID) *big.Int {
+	amount, err := s.table.DelegatorOldRewards.Get(id.Bytes())
 	if err != nil {
 		s.Log.Crit("Failed to erase key-value", "err", err)
 	}
@@ -56,30 +55,30 @@ func (s *Store) GetDelegatorClaimedRewards(addr common.Address) *big.Int {
 }
 
 // SetDelegatorClaimedRewards sets sum of claimed rewards in past
-func (s *Store) SetDelegatorClaimedRewards(addr common.Address, amount *big.Int) {
-	err := s.table.DelegatorOldRewards.Put(addr.Bytes(), amount.Bytes())
+func (s *Store) SetDelegatorClaimedRewards(id sfctype.DelegatorID, amount *big.Int) {
+	err := s.table.DelegatorOldRewards.Put(id.Bytes(), amount.Bytes())
 	if err != nil {
 		s.Log.Crit("Failed to put key-value", "err", err)
 	}
 }
 
 // IncDelegatorClaimedRewards increments sum of claimed rewards in past
-func (s *Store) IncDelegatorClaimedRewards(addr common.Address, diff *big.Int) {
-	amount := s.GetDelegatorClaimedRewards(addr)
+func (s *Store) IncDelegatorClaimedRewards(id sfctype.DelegatorID, diff *big.Int) {
+	amount := s.GetDelegationClaimedRewards(id)
 	amount.Add(amount, diff)
-	s.SetDelegatorClaimedRewards(addr, amount)
+	s.SetDelegatorClaimedRewards(id, amount)
 }
 
 // DelDelegatorClaimedRewards deletes record about sum of claimed rewards in past
-func (s *Store) DelDelegatorClaimedRewards(addr common.Address) {
-	err := s.table.DelegatorOldRewards.Delete(addr.Bytes())
+func (s *Store) DelDelegatorClaimedRewards(id sfctype.DelegatorID) {
+	err := s.table.DelegatorOldRewards.Delete(id.Bytes())
 	if err != nil {
 		s.Log.Crit("Failed to erase key-value", "err", err)
 	}
 }
 
-// GetStakerDelegatorsClaimedRewards returns sum of claimed rewards in past, by this delegators of this staker
-func (s *Store) GetStakerDelegatorsClaimedRewards(stakerID idx.StakerID) *big.Int {
+// GetStakerDelegationsClaimedRewards returns sum of claimed rewards in past, by this delegators of this staker
+func (s *Store) GetStakerDelegationsClaimedRewards(stakerID idx.StakerID) *big.Int {
 	amount, err := s.table.StakerDelegatorsOldRewards.Get(stakerID.Bytes())
 	if err != nil {
 		s.Log.Crit("Failed to erase key-value", "err", err)
@@ -100,7 +99,7 @@ func (s *Store) SetStakerDelegatorsClaimedRewards(stakerID idx.StakerID, amount 
 
 // IncStakerDelegatorsClaimedRewards increments sum of claimed rewards in past
 func (s *Store) IncStakerDelegatorsClaimedRewards(stakerID idx.StakerID, diff *big.Int) {
-	amount := s.GetStakerDelegatorsClaimedRewards(stakerID)
+	amount := s.GetStakerDelegationsClaimedRewards(stakerID)
 	amount.Add(amount, diff)
 	s.SetStakerDelegatorsClaimedRewards(stakerID, amount)
 }

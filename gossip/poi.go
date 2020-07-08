@@ -47,7 +47,7 @@ func (s *Service) updateUsersPOI(block *inter.Block, evmBlock *evmcore.EvmBlock,
 		prevUserPoiPeriod := PoiPeriod(senderLastTxTime, &s.config.Net.Economy)
 		senderTotalFee := s.app.GetAddressFee(sender, prevUserPoiPeriod)
 
-		delegator := s.app.GetSfcDelegator(sender)
+		delegator := s.app.GetSfcDelegation(sender)
 		if delegator != nil {
 			staker := s.app.GetSfcStaker(delegator.ToStakerID)
 			if staker != nil {
