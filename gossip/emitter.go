@@ -84,6 +84,7 @@ type Emitter struct {
 }
 
 type selfForkProtection struct {
+	startupTime             time.Time
 	connectedTime           time.Time
 	syncedTime              time.Time
 	prevLocalEmittedID      hash.Event
@@ -115,6 +116,7 @@ func NewEmitter(
 // init emitter without starting events emission
 func (em *Emitter) init() {
 	em.syncStatus.connectedTime = time.Now()
+	em.syncStatus.startupTime = time.Now()
 	validators, epoch := em.world.Engine.GetEpochValidators()
 	em.OnNewEpoch(validators, epoch)
 }
@@ -544,20 +546,24 @@ func (em *Emitter) OnNewEvent(e *inter.Event) {
 
 	// event was emitted by me on another instance
 	em.syncStatus.prevExternalEmittedTime = time.Now()
-	if synced, _, _ := em.isSynced(); !synced {
+
+	eventTime := inter.MaxTimestamp(e.ClaimedTime, e.MedianTime).Time()
+	if eventTime.Before(em.syncStatus.startupTime) {
 		return
 	}
 
-	passedSinceEvent := time.Since(inter.MaxTimestamp(e.ClaimedTime, e.MedianTime).Time())
+	passedSinceEvent := time.Since(eventTime)
 	threshold := em.intervals.SelfForkProtection
 	if threshold > time.Minute {
 		threshold = time.Minute
 	}
 	if passedSinceEvent <= threshold {
-		reason := "Received a recent event (event id=%s) from this validator (staker id=%d) which wasn't created on this node.\n" +
+		reason := "Received a recent event (event id=%s) from this validator (staker ID=%d) which wasn't created on this node.\n" +
 			"This external event was created %s, %s ago at the time of this error.\n" +
-			"It means that a duplicating instance of the same validator is running simultaneously, which will eventually lead to a doublesign.\n" +
-			"For now, doublesign was prevented by one of the heuristics, but next time you (and your delegators) may lose the stake."
+			"It might mean that a duplicating instance of the same validator is running simultaneously, which may eventually lead to a doublesign.\n" +
+			"The node was stopped by one of the doublesign protection heuristics.\n" +
+			"There's no guaranteed automatic protection against a doublesign," +
+			"please always ensure that no more than one instance of the same validator is running."
 		errlock.Permanent(fmt.Errorf(reason, e.Hash().String(), em.myStakerID, e.ClaimedTime.Time().Local().String(), passedSinceEvent.String()))
 	}
 
