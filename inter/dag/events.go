@@ -7,7 +7,7 @@ import (
 )
 
 // Events is a ordered slice of events.
-type Events []*Event
+type Events []Event
 
 // String returns human readable representation.
 func (ee Events) String() string {
@@ -32,7 +32,7 @@ func (ee Events) ByParents() (res Events) {
 	EVENTS:
 		for i, e := range unsorted {
 
-			for _, p := range e.Parents {
+			for _, p := range e.Parents() {
 				if exists.Contains(p) && !ready.Contains(p) {
 					continue EVENTS
 				}

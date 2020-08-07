@@ -43,7 +43,7 @@ func ForEachRandFork(
 	r *rand.Rand,
 	callback ForEachEvent,
 ) (
-	events map[idx.StakerID][]*dag.Event,
+	events map[idx.StakerID][]dag.Event,
 ) {
 	if r == nil {
 		// fixed seed
@@ -51,7 +51,7 @@ func ForEachRandFork(
 	}
 	// init results
 	nodeCount := len(nodes)
-	events = make(map[idx.StakerID][]*dag.Event, nodeCount)
+	events = make(map[idx.StakerID][]dag.Event, nodeCount)
 	cheaters := map[idx.StakerID]int{}
 	for _, cheater := range cheatersArr {
 		cheaters[cheater] = 0
@@ -71,12 +71,11 @@ func ForEachRandFork(
 		}
 		parents = parents[:parentCount-1]
 		// make
-		e := &dag.Event{
-			Creator: creator,
-			Parents: hash.Events{},
-		}
+		te := TestEvent{}
+		te.SetCreator(creator)
+		te.SetParents(hash.Events{})
 		// first parent is a last creator's event or empty hash
-		var parent *dag.Event
+		var parent dag.Event
 		if ee := events[creator]; len(ee) > 0 {
 			parent = ee[len(ee)-1]
 
@@ -90,32 +89,32 @@ func ForEachRandFork(
 				if r.Intn(len(ee)) == 0 {
 					parent = nil
 				}
-				//e.Extra = bigendian.Uint32ToBytes(uint32(i)) // make hash for each unique, because for forks we may have the same events
 				cheaters[creator]++
 			}
 		}
 		if parent == nil {
-			e.Seq = 1
-			e.Lamport = 1
+			te.SetSeq(1)
+			te.SetLamport(1)
 		} else {
-			e.Seq = parent.Seq + 1
-			e.Parents.Add(parent.ID())
-			e.Lamport = parent.Lamport + 1
+			te.SetSeq(parent.Seq() + 1)
+			te.AddParent(parent.ID())
+			te.SetLamport(parent.Lamport() + 1)
 		}
 		// other parents are the lasts other's events
 		for _, other := range parents {
 			if ee := events[nodes[other]]; len(ee) > 0 {
 				parent := ee[len(ee)-1]
-				e.Parents.Add(parent.ID())
-				if e.Lamport <= parent.Lamport {
-					e.Lamport = parent.Lamport + 1
+				te.AddParent(parent.ID())
+				if te.Lamport() <= parent.Lamport() {
+					te.SetLamport(parent.Lamport() + 1)
 				}
 			}
 		}
 		name := fmt.Sprintf("%s%03d", string('a'+self), len(events[creator]))
 		// buildEvent callback
+		var e dag.Event
 		if callback.Build != nil {
-			e = callback.Build(e, name)
+			e = callback.Build(&te, name)
 		}
 		if e == nil {
 			continue
@@ -148,7 +147,7 @@ func ForEachRandEvent(
 	r *rand.Rand,
 	callback ForEachEvent,
 ) (
-	events map[idx.StakerID][]*dag.Event,
+	events map[idx.StakerID][]*dag.BaseEvent,
 ) {
 	return ForEachRandFork(nodes, []idx.StakerID{}, eventCount, parentCount, 0, r, callback)
 }
@@ -162,7 +161,7 @@ func GenRandEvents(
 	parentCount int,
 	r *rand.Rand,
 ) (
-	events map[idx.StakerID][]*dag.Event,
+	events map[idx.StakerID][]*dag.BaseEvent,
 ) {
 	return ForEachRandEvent(nodes, eventCount, parentCount, r, ForEachEvent{})
 }

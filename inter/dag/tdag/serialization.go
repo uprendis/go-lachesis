@@ -1,7 +1,6 @@
 package tdag
 
 import (
-	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"github.com/ethereum/go-ethereum/rlp"
 	"io"
 )
@@ -9,21 +8,21 @@ import (
 // TODO eliminate dependency on RLP in tests
 
 // EventToBytes serializes events
-func EventToBytes(e *dag.Event) []byte {
+func EventToBytes(e *TestEvent) []byte {
 	b, _ := rlp.EncodeToBytes(e)
 	return b
 }
 
 // BytesToEvent deserializes event from bytes
-func BytesToEvent(b []byte) (*dag.Event, error) {
-	e := &dag.Event{}
+func BytesToEvent(b []byte) (*TestEvent, error) {
+	e := &TestEvent{}
 	err := rlp.DecodeBytes(b, e)
 	return e, err
 }
 
 // DecodeEvent deserializes event
-func DecodeEvent(r io.Reader) (*dag.Event, error) {
-	e := &dag.Event{}
+func DecodeEvent(r io.Reader) (*TestEvent, error) {
+	e := &TestEvent{}
 	err := rlp.Decode(r, e)
 	return e, err
 }

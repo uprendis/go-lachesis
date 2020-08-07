@@ -30,7 +30,22 @@ type Event interface {
 }
 
 type MutableEvent interface {
+	Event
+	SetEpoch(idx.Epoch)
+	SetSeq(idx.Event)
 
+	SetFrame(idx.Frame)
+	SetIsRoot(bool)
+
+	SetCreator(idx.StakerID)
+
+	SetParents(hash.Events)
+
+	SetLamport(idx.Lamport)
+	SetClaimedTime(inter.Timestamp)
+	SetMedianTime(inter.Timestamp)
+
+	SetID(id [24]byte)
 }
 
 // BaseEvent is the consensus message in the Lachesis consensus algorithm
@@ -55,40 +70,18 @@ type BaseEvent struct {
 	id hash.Event
 }
 
-// MutableBaseEvent is a mutable version of BaseEvent
 type MutableBaseEvent struct {
-	Epoch idx.Epoch
-	Seq   idx.Event
-
-	Frame  idx.Frame
-	IsRoot bool
-
-	Creator idx.StakerID
-
-	Parents hash.Events
-
-	Lamport     idx.Lamport
-	ClaimedTime inter.Timestamp
-	MedianTime  inter.Timestamp
+	BaseEvent
 }
+//type MutableBaseEvent BaseEvent
 
-func (e *MutableBaseEvent) Build(r_id [24]byte) *BaseEvent {
-	id := hash.Event{}
-	copy(id[0:4], e.Epoch.Bytes())
-	copy(id[4:8], e.Lamport.Bytes())
-	copy(id[8:], r_id[:])
-	return &BaseEvent{
-		epoch:       e.Epoch,
-		seq:         e.Seq,
-		frame:       e.Frame,
-		isRoot:      e.IsRoot,
-		creator:     e.Creator,
-		parents:     e.Parents,
-		lamport:     e.Lamport,
-		claimedTime: e.ClaimedTime,
-		medianTime:  e.MedianTime,
-		id:          id,
-	}
+// Build build immutable event
+func (me *MutableBaseEvent) Build(r_id [24]byte) *BaseEvent {
+	e := me.BaseEvent
+	copy(e.id[0:4], e.epoch.Bytes())
+	copy(e.id[4:8], e.lamport.Bytes())
+	copy(e.id[8:], r_id[:])
+	return &e
 }
 
 // fmtFrame returns frame string representation.
@@ -101,7 +94,7 @@ func fmtFrame(frame idx.Frame, isRoot bool) string {
 
 // String returns string representation.
 func (e *BaseEvent) String() string {
-	return fmt.Sprintf("{id=%s, p=%s, by=%d, frame=%s}", e.ID().ShortID(3), e.Parents().String(), e.Creator(), fmtFrame(e.Frame(), e.IsRoot()))
+	return fmt.Sprintf("{id=%s, p=%s, by=%d, frame=%s}", e.id.ShortID(3), e.parents.String(), e.creator, fmtFrame(e.frame, e.isRoot))
 }
 
 // SelfParent returns event's self-parent, if any
@@ -118,4 +111,48 @@ func (e *BaseEvent) IsSelfParent(hash hash.Event) bool {
 		return false
 	}
 	return *e.SelfParent() == hash
+}
+
+func (e *BaseEvent) Epoch() idx.Epoch { return e.epoch }
+
+func (e *BaseEvent) Seq() idx.Event { return e.seq }
+
+func (e *BaseEvent) Frame() idx.Frame { return e.frame }
+
+func (e *BaseEvent) IsRoot() bool { return e.isRoot }
+
+func (e *BaseEvent) Creator() idx.StakerID { return e.creator }
+
+func (e *BaseEvent) Parents() hash.Events { return e.parents }
+
+func (e *BaseEvent) Lamport() idx.Lamport { return e.lamport }
+
+func (e *BaseEvent) ClaimedTime() inter.Timestamp { return e.claimedTime }
+
+func (e *BaseEvent) MedianTime() inter.Timestamp { return e.medianTime }
+
+func (e *BaseEvent) ID() hash.Event { return e.id }
+
+func (e *MutableBaseEvent) SetEpoch(v idx.Epoch) { e.epoch = v }
+
+func (e *MutableBaseEvent) SetSeq(v idx.Event) { e.seq = v }
+
+func (e *MutableBaseEvent) SetFrame(v idx.Frame) { e.frame = v }
+
+func (e *MutableBaseEvent) SetIsRoot(v bool) { e.isRoot = v }
+
+func (e *MutableBaseEvent) SetCreator(v idx.StakerID) { e.creator = v }
+
+func (e *MutableBaseEvent) SetParents(v hash.Events) { e.parents = v }
+
+func (e *MutableBaseEvent) SetLamport(v idx.Lamport) { e.lamport = v }
+
+func (e *MutableBaseEvent) SetClaimedTime(v inter.Timestamp) { e.claimedTime = v }
+
+func (e *MutableBaseEvent) SetMedianTime(v inter.Timestamp) { e.medianTime = v }
+
+func (e *MutableBaseEvent) SetID(r_id [24]byte) {
+	copy(e.id[0:4], e.epoch.Bytes())
+	copy(e.id[4:8], e.lamport.Bytes())
+	copy(e.id[8:], r_id[:])
 }
