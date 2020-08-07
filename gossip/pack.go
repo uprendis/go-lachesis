@@ -2,7 +2,7 @@ package gossip
 
 import (
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 )
 
@@ -18,12 +18,12 @@ const (
 	maxPackEventsNum = softLimitItems
 )
 
-func (s *Service) packsOnNewEvent(e *inter.Event, epoch idx.Epoch) {
+func (s *Service) packsOnNewEvent(e *dag.Event, epoch idx.Epoch) {
 	// due to default values, we don't need to explicitly set values at a start of an epoch
 	packIdx := s.store.GetPacksNumOrDefault(epoch)
 	packInfo := s.store.GetPackInfoOrDefault(s.engine.GetEpoch(), packIdx)
 
-	s.store.AddToPack(epoch, packIdx, e.Hash())
+	s.store.AddToPack(epoch, packIdx, e.ID())
 
 	packInfo.Index = packIdx
 	packInfo.NumOfEvents++

@@ -3,6 +3,8 @@ package gossip
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
 	"math/big"
 	"sync"
 	"testing"
@@ -13,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/lachesis"
 	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
@@ -22,14 +23,14 @@ import (
 
 // newTestProtocolManager creates a new protocol manager for testing purposes,
 // with the given number of events already known from each node
-func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.Transaction, onNewEvent func(e *inter.Event)) (*ProtocolManager, *Store, error) {
+func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.Transaction, onNewEvent func(e *dag.Event)) (*ProtocolManager, *Store, error) {
 	net := lachesis.FakeNetConfig(genesis.FakeValidators(nodesNum, big.NewInt(0), pos.StakeToBalance(1)))
 
 	config := DefaultConfig(net)
 	config.TxPool.Journal = ""
 
 	engineStore := poset.NewMemStore()
-	err := engineStore.ApplyGenesis(&net.Genesis, hash.Event{}, common.Hash{})
+	err := engineStore.ApplyGenesis(&net.Genesis, hash.Event{}, hash.Hash{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -41,7 +42,7 @@ func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.T
 	}
 
 	engine := poset.New(net.Dag, engineStore, store)
-	engine.Bootstrap(inter.ConsensusCallbacks{})
+	engine.Bootstrap(lachesis.ConsensusCallbacks{})
 
 	pm, err := NewProtocolManager(
 		&config,
@@ -57,8 +58,8 @@ func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.T
 		return nil, nil, err
 	}
 
-	inter.ForEachRandEvent(net.Genesis.Alloc.Validators.Validators().IDs(), eventsNum, 3, nil, inter.ForEachEvent{
-		Process: func(e *inter.Event, name string) {
+	tdag.ForEachRandEvent(net.Genesis.Alloc.Validators.Validators().IDs(), eventsNum, 3, nil, tdag.ForEachEvent{
+		Process: func(e *dag.Event, name string) {
 			store.SetEvent(e)
 			err = engine.ProcessEvent(e)
 			if err != nil {
@@ -68,7 +69,7 @@ func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.T
 				onNewEvent(e)
 			}
 		},
-		Build: func(e *inter.Event, name string) *inter.Event {
+		Build: func(e *dag.Event, name string) *dag.Event {
 			e.Epoch = 1
 			return engine.Prepare(e)
 		},
@@ -81,7 +82,7 @@ func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.T
 // newTestProtocolManagerMust creates a new protocol manager for testing purposes,
 // with the given number of events already known from each peer. In case of an error, the constructor force-
 // fails the test.
-func newTestProtocolManagerMust(t *testing.T, nodes int, events int, newtx chan<- []*types.Transaction, onNewEvent func(e *inter.Event)) (*ProtocolManager, *Store) {
+func newTestProtocolManagerMust(t *testing.T, nodes int, events int, newtx chan<- []*types.Transaction, onNewEvent func(e *dag.Event)) (*ProtocolManager, *Store) {
 	pm, db, err := newTestProtocolManager(nodes, events, newtx, onNewEvent)
 	if err != nil {
 		t.Fatalf("Failed to create protocol manager: %v", err)
@@ -147,13 +148,13 @@ func newTestPeer(name string, version int, pm *ProtocolManager, shake bool) (*te
 
 // handshake simulates a trivial handshake that expects the same state from the
 // remote side as we are simulating locally.
-func (p *testPeer) handshake(t *testing.T, progress *PeerProgress, genesis common.Hash) {
+func (p *testPeer) handshake(t *testing.T, progress *PeerProgress, genesis hash.Hash) {
 	msg := &ethStatusData{
 		ProtocolVersion:   uint32(p.version),
 		NetworkID:         lachesis.FakeNetworkID,
 		Genesis:           genesis,
 		DummyTD:           big.NewInt(int64(progress.NumOfBlocks)), // for ETH clients
-		DummyCurrentBlock: common.Hash(progress.LastBlock),
+		DummyCurrentBlock: hash.Hash(progress.LastBlock),
 	}
 	if err := p2p.ExpectMsg(p.app, EthStatusMsg, msg); err != nil {
 		t.Fatalf("status recv: %v", err)

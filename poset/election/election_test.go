@@ -1,6 +1,8 @@
 package election
 
 import (
+	dag2 "github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -9,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/utils"
@@ -195,27 +196,27 @@ func testProcessRoot(
 	assertar := assert.New(t)
 
 	// events:
-	ordered := make(inter.Events, 0)
-	events := make(map[hash.Event]*inter.Event)
+	ordered := make(dag2.Events, 0)
+	events := make(map[hash.Event]*dag2.Event)
 	frameRoots := make(map[idx.Frame][]RootAndSlot)
 	vertices := make(map[hash.Event]Slot)
 	edges := make(map[fakeEdge]bool)
 
-	nodes, _, _ := inter.ASCIIschemeForEach(dag, inter.ForEachEvent{
-		Process: func(root *inter.Event, name string) {
+	nodes, _, _ := tdag.ASCIIschemeForEach(dag, tdag.ForEachEvent{
+		Process: func(root *dag2.Event, name string) {
 			// store all the events
 			ordered = append(ordered, root)
 
-			events[root.Hash()] = root
+			events[root.ID()] = root
 
 			slot := Slot{
 				Frame:     frameOf(name),
 				Validator: root.Creator,
 			}
-			vertices[root.Hash()] = slot
+			vertices[root.ID()] = slot
 
 			frameRoots[frameOf(name)] = append(frameRoots[frameOf(name)], RootAndSlot{
-				ID:   root.Hash(),
+				ID:   root.ID(),
 				Slot: slot,
 			})
 
@@ -224,7 +225,7 @@ func testProcessRoot(
 			if strings.HasPrefix(name, "+") {
 				noPrev = true
 			}
-			from := root.Hash()
+			from := root.ID()
 			for _, observed := range root.Parents {
 				if root.IsSelfParent(observed) && noPrev {
 					continue
@@ -257,7 +258,7 @@ func testProcessRoot(
 	}
 
 	// re-order events randomly, preserving parents order
-	unordered := make(inter.Events, len(ordered))
+	unordered := make(dag2.Events, len(ordered))
 	for i, j := range rand.Perm(len(ordered)) {
 		unordered[i] = ordered[j]
 	}
@@ -268,7 +269,7 @@ func testProcessRoot(
 	// processing:
 	var alreadyDecided bool
 	for _, root := range ordered {
-		rootHash := root.Hash()
+		rootHash := root.ID()
 		rootSlot, ok := vertices[rootHash]
 		if !ok {
 			t.Fatal("inconsistent vertices")
@@ -282,7 +283,7 @@ func testProcessRoot(
 		}
 
 		// checking:
-		decisive := expected != nil && expected.DecisiveRoots[root.Hash().String()]
+		decisive := expected != nil && expected.DecisiveRoots[root.ID().String()]
 		if decisive || alreadyDecided {
 			assertar.NotNil(got)
 			assertar.Equal(expected.DecidedFrame, got.Frame)

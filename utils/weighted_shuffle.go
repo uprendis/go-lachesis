@@ -16,7 +16,7 @@ type weightedShuffleNode struct {
 }
 
 type weightedShuffleTree struct {
-	seed      common.Hash
+	seed      hash.Hash
 	seedIndex int
 
 	weights []pos.Stake
@@ -59,7 +59,7 @@ func (t *weightedShuffleTree) rand64() uint64 {
 		t.seedIndex = 0
 	}
 	// use not used parts of old seed, instead of calculating new one
-	res := littleendian.BytesToInt64(t.seed[t.seedIndex : t.seedIndex+8])
+	res := littleendian.BytesToUint64(t.seed[t.seedIndex : t.seedIndex+8])
 	t.seedIndex += 8
 	return res
 }
@@ -87,7 +87,7 @@ func (t *weightedShuffleTree) retrieve(i int) int {
 // WeightedPermutation builds weighted random permutation
 // Returns first {size} entries of {weights} permutation.
 // Call with {size} == len(weights) to get the whole permutation.
-func WeightedPermutation(size int, weights []pos.Stake, seed common.Hash) []int {
+func WeightedPermutation(size int, weights []pos.Stake, seed hash.Hash) []int {
 	if len(weights) < size {
 		panic("the permutation size must be less or equal to weights size")
 	}

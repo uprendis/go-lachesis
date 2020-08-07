@@ -1,7 +1,8 @@
-package inter
+package tdag
 
 import (
 	"fmt"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"strconv"
 	"strings"
 
@@ -10,8 +11,8 @@ import (
 )
 
 type ForEachEvent struct {
-	Process func(e *Event, name string)
-	Build   func(e *Event, name string) *Event
+	Process func(e *dag.Event, name string)
+	Build   func(e *dag.Event, name string) *dag.Event
 }
 
 // ASCIIschemeToDAG parses events from ASCII-scheme for test purpose.
@@ -25,11 +26,11 @@ func ASCIIschemeForEach(
 	callback ForEachEvent,
 ) (
 	nodes []idx.StakerID,
-	events map[idx.StakerID][]*Event,
-	names map[string]*Event,
+	events map[idx.StakerID][]*dag.Event,
+	names map[string]*dag.Event,
 ) {
-	events = make(map[idx.StakerID][]*Event)
-	names = make(map[string]*Event)
+	events = make(map[idx.StakerID][]*dag.Event)
+	names = make(map[string]*dag.Event)
 	var (
 		prevFarRefs map[int]int
 		curFarRefs  = make(map[int]int)
@@ -134,7 +135,7 @@ func ASCIIschemeForEach(
 			if last := len(events[creator]) - prevRef - 1; last >= 0 {
 				parent := events[creator][last]
 				index = parent.Seq + 1
-				parents.Add(parent.Hash())
+				parents.Add(parent.ID())
 				maxLamport = parent.Lamport
 			} else {
 				index = 1
@@ -152,10 +153,10 @@ func ASCIIschemeForEach(
 					break
 				}
 				parent := events[other][last]
-				if parents.Set().Contains(parent.Hash()) {
+				if parents.Set().Contains(parent.ID()) {
 					continue
 				}
-				parents.Add(parent.Hash())
+				parents.Add(parent.ID())
 				if maxLamport < parent.Lamport {
 					maxLamport = parent.Lamport
 				}
@@ -180,7 +181,7 @@ func ASCIIschemeForEach(
 			// save event
 			events[creator] = append(events[creator], e)
 			names[name] = e
-			hash.SetEventName(e.Hash(), name)
+			hash.SetEventName(e.ID(), name)
 			// callback
 			if callback.Process != nil {
 				callback.Process(e, name)
@@ -193,7 +194,7 @@ func ASCIIschemeForEach(
 		if len(ee) < 1 {
 			continue
 		}
-		name := []rune(ee[0].Hash().String())
+		name := []rune(ee[0].ID().String())
 		if strings.HasPrefix(string(name), "node") {
 			hash.SetNodeName(node, "node"+strings.ToUpper(string(name[4:5])))
 		} else {
@@ -208,20 +209,20 @@ func ASCIIschemeToDAG(
 	scheme string,
 ) (
 	nodes []idx.StakerID,
-	events map[idx.StakerID][]*Event,
-	names map[string]*Event,
+	events map[idx.StakerID][]*dag.Event,
+	names map[string]*dag.Event,
 ) {
 	return ASCIIschemeForEach(scheme, ForEachEvent{})
 }
 
 // DAGtoASCIIscheme builds ASCII-scheme of events for debug purpose.
-func DAGtoASCIIscheme(events Events) (string, error) {
+func DAGtoASCIIscheme(events dag.Events) (string, error) {
 	events = events.ByParents()
 
 	var (
 		scheme rows
 
-		processed = make(map[hash.Event]*Event)
+		processed = make(map[hash.Event]*dag.Event)
 		nodeCols  = make(map[idx.StakerID]int)
 		ok        bool
 
@@ -248,7 +249,7 @@ func DAGtoASCIIscheme(events Events) (string, error) {
 			creatorLastIndex[e.Creator]++
 		}
 
-		ehash := e.Hash()
+		ehash := e.ID()
 		r := &row{}
 		// creator
 		if r.Self, ok = nodeCols[e.Creator]; !ok {
@@ -291,7 +292,7 @@ func DAGtoASCIIscheme(events Events) (string, error) {
 				shift = 1
 			}
 
-			r.Refs[refCol] = creatorLastIndex[parent.Creator] - eventIndex[parent.Creator][parent.Hash()] + shift
+			r.Refs[refCol] = creatorLastIndex[parent.Creator] - eventIndex[parent.Creator][parent.ID()] + shift
 		}
 		if (e.Seq <= 1 && selfRefs != 0) || (e.Seq > 1 && selfRefs != 1) {
 			return "", fmt.Errorf("self-parents count of %s is %d", ehash, selfRefs)

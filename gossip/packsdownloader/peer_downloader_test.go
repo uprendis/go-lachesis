@@ -155,12 +155,12 @@ func testBinarySearch(t *testing.T, test *binarySearchTest) {
 		// build info with 1 head
 		info := &packInfoData{
 			index: index,
-			heads: hash.Events{e.Hash()},
+			heads: hash.Events{e.ID()},
 		}
 		d.packInfos.Put(int(index), info)
 		if isKnown {
 			// memorize pack as known
-			knownHeads[e.Hash()] = true
+			knownHeads[e.ID()] = true
 		}
 	}
 

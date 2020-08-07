@@ -2,8 +2,8 @@ package epochcheck
 
 import (
 	"errors"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/lachesis"
@@ -35,7 +35,7 @@ func New(config *lachesis.DagConfig, reader DagReader) *Checker {
 }
 
 // Validate event
-func (v *Checker) Validate(e *inter.Event) error {
+func (v *Checker) Validate(e *dag.Event) error {
 	// check epoch first, because validators group is known only for the current epoch
 	validators, epoch := v.reader.GetEpochValidators()
 	if e.Epoch != epoch {

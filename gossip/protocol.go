@@ -115,8 +115,8 @@ type ethStatusData struct {
 	ProtocolVersion   uint32
 	NetworkID         uint64
 	DummyTD           *big.Int
-	DummyCurrentBlock common.Hash
-	Genesis           common.Hash
+	DummyCurrentBlock hash.Hash
+	Genesis           hash.Hash
 }
 
 // PeerProgress is synchronization status of a peer

@@ -2,15 +2,16 @@ package poset
 
 import (
 	"fmt"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
+	"github.com/Fantom-foundation/go-lachesis/lachesis"
 	"math/rand"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/kvdb"
 	"github.com/Fantom-foundation/go-lachesis/kvdb/fallible"
@@ -30,7 +31,7 @@ func TestRestore(t *testing.T) {
 		RESTORED  = 2 // second with restoring
 	)
 
-	nodes := inter.GenNodes(5)
+	nodes := tdag.GenNodes(5)
 	posets := make([]*ExtendedPoset, 0, COUNT)
 	inputs := make([]*EventStore, 0, COUNT)
 	namespaces := make([]string, 0, COUNT)
@@ -53,27 +54,27 @@ func TestRestore(t *testing.T) {
 	// seal epoch on decided frame == maxEpochBlocks
 	for _, poset := range posets {
 		applyBlock := poset.callback.ApplyBlock
-		poset.callback.ApplyBlock = func(block *inter.Block, decidedFrame idx.Frame, cheaters inter.Cheaters) (common.Hash, bool) {
+		poset.callback.ApplyBlock = func(block *lachesis.Block, decidedFrame idx.Frame, cheaters lachesis.Cheaters) (hash.Hash, bool) {
 			h, _ := applyBlock(block, decidedFrame, cheaters)
 			return h, decidedFrame == idx.Frame(maxEpochBlocks)
 		}
 	}
 
 	// create events
-	var ordered []*inter.Event
+	var ordered []*dag.Event
 	for epoch := idx.Epoch(1); epoch <= idx.Epoch(epochs); epoch++ {
 		stability := rand.New(rand.NewSource(int64(epoch)))
-		_ = inter.ForEachRandEvent(nodes, maxEpochBlocks*4, COUNT, stability, inter.ForEachEvent{
-			Process: func(e *inter.Event, name string) {
+		_ = tdag.ForEachRandEvent(nodes, maxEpochBlocks*4, COUNT, stability, tdag.ForEachEvent{
+			Process: func(e *dag.Event, name string) {
 				inputs[GENERATOR].SetEvent(e)
 				assertar.NoError(
 					posets[GENERATOR].ProcessEvent(e))
 				assertar.NoError(
-					flushDb(posets[GENERATOR], e.Hash()))
+					flushDb(posets[GENERATOR], e.ID()))
 
 				ordered = append(ordered, e)
 			},
-			Build: func(e *inter.Event, name string) *inter.Event {
+			Build: func(e *dag.Event, name string) *dag.Event {
 				e.Epoch = epoch
 				if e.Seq%2 != 0 {
 					e.Transactions = append(e.Transactions, &types.Transaction{})
@@ -119,13 +120,13 @@ func TestRestore(t *testing.T) {
 		assertar.NoError(
 			posets[EXPECTED].ProcessEvent(e))
 		assertar.NoError(
-			flushDb(posets[EXPECTED], e.Hash()))
+			flushDb(posets[EXPECTED], e.ID()))
 
 		inputs[RESTORED].SetEvent(e)
 		assertar.NoError(
 			posets[RESTORED].ProcessEvent(e))
 		assertar.NoError(
-			flushDb(posets[RESTORED], e.Hash()))
+			flushDb(posets[RESTORED], e.ID()))
 
 		compareStates(assertar, posets[EXPECTED], posets[RESTORED])
 		if t.Failed() {
@@ -149,7 +150,7 @@ func TestDbFailure(t *testing.T) {
 		EXPECTED  = 1 // first as etalon
 		RESTORED  = 2 // second with db failures
 	)
-	nodes := inter.GenNodes(5)
+	nodes := tdag.GenNodes(5)
 
 	var realDb *fallible.Fallible
 	setRealDb := func(db kvdb.KeyValueStore) kvdb.KeyValueStore {
@@ -186,16 +187,16 @@ func TestDbFailure(t *testing.T) {
 
 	stability := rand.New(rand.NewSource(1))
 	// create events on etalon poset
-	var ordered inter.Events
-	inter.ForEachRandEvent(nodes, maxEpochBlocks-1, COUNT, stability, inter.ForEachEvent{
-		Process: func(e *inter.Event, name string) {
+	var ordered dag.Events
+	tdag.ForEachRandEvent(nodes, maxEpochBlocks-1, COUNT, stability, tdag.ForEachEvent{
+		Process: func(e *dag.Event, name string) {
 			ordered = append(ordered, e)
 
 			inputs[GENERATOR].SetEvent(e)
 			assertar.NoError(
 				posets[GENERATOR].ProcessEvent(e))
 		},
-		Build: func(e *inter.Event, name string) *inter.Event {
+		Build: func(e *dag.Event, name string) *dag.Event {
 			e.Epoch = 1
 			if e.Seq%2 != 0 {
 				e.Transactions = append(e.Transactions, &types.Transaction{})
@@ -216,7 +217,7 @@ func TestDbFailure(t *testing.T) {
 		SetName("restored-0")
 
 	x := 0
-	process := func(e *inter.Event) (ok bool) {
+	process := func(e *dag.Event) (ok bool) {
 		ok = true
 		defer func() {
 			// catch a panic
@@ -246,13 +247,13 @@ func TestDbFailure(t *testing.T) {
 		assertar.NoError(
 			posets[RESTORED].ProcessEvent(e))
 		assertar.NoError(
-			flushDb(posets[RESTORED], e.Hash()))
+			flushDb(posets[RESTORED], e.ID()))
 
 		inputs[EXPECTED].SetEvent(e)
 		assertar.NoError(
 			posets[EXPECTED].ProcessEvent(e))
 		assertar.NoError(
-			flushDb(posets[EXPECTED], e.Hash()))
+			flushDb(posets[EXPECTED], e.ID()))
 
 		return
 	}
@@ -282,7 +283,7 @@ func compareStates(assertar *assert.Assertions, expected, restored *ExtendedPose
 	assertar.Equal(
 		*expected.Checkpoint, *restored.Checkpoint)
 	assertar.Equal(
-		expected.EpochState.PrevEpoch.Hash(), restored.EpochState.PrevEpoch.Hash())
+		expected.EpochState.PrevEpoch.ID(), restored.EpochState.PrevEpoch.ID())
 	assertar.Equal(
 		expected.EpochState.Validators, restored.EpochState.Validators)
 	assertar.Equal(

@@ -1,6 +1,7 @@
 package poset
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -56,18 +57,18 @@ func (s *EventStore) Close() {
 }
 
 // SetEvent stores event.
-func (s *EventStore) SetEvent(e *inter.Event) {
-	s.set(s.table.Events, e.Hash().Bytes(), e)
-	s.cache.Events.Add(e.Hash(), e)
+func (s *EventStore) SetEvent(e *dag.Event) {
+	s.set(s.table.Events, e.ID().Bytes(), e)
+	s.cache.Events.Add(e.ID(), e)
 }
 
 // GetEvent returns stored event.
-func (s *EventStore) GetEvent(h hash.Event) *inter.Event {
+func (s *EventStore) GetEvent(h hash.Event) *dag.Event {
 	if val, ok := s.cache.Events.Get(h); ok {
-		return val.(*inter.Event)
+		return val.(*dag.Event)
 	}
 
-	w, _ := s.get(s.table.Events, h.Bytes(), &inter.Event{}).(*inter.Event)
+	w, _ := s.get(s.table.Events, h.Bytes(), &dag.Event{}).(*dag.Event)
 	if w == nil {
 		return nil
 	}
@@ -75,14 +76,14 @@ func (s *EventStore) GetEvent(h hash.Event) *inter.Event {
 	return w
 }
 
-// GetEventHeader returns stored event header.
+// GetEvent returns stored event header.
 // Note: fake epoch partition.
-func (s *EventStore) GetEventHeader(_ idx.Epoch, h hash.Event) *inter.EventHeaderData {
+func (s *EventStore) GetEvent(_ idx.Epoch, h hash.Event) *dag.Event {
 	e := s.GetEvent(h)
 	if e == nil {
 		return nil
 	}
-	return &e.EventHeaderData
+	return &e.Event
 }
 
 // HasEvent returns true if event exists.
@@ -113,9 +114,9 @@ func TestEventStore(t *testing.T) {
 		events := inter.FakeFuzzingEvents()
 		for _, e0 := range events {
 			store.SetEvent(e0)
-			e1 := store.GetEvent(e0.Hash())
+			e1 := store.GetEvent(e0.ID())
 
-			if !assertar.Equal(e0.Hash(), e1.Hash()) {
+			if !assertar.Equal(e0.ID(), e1.ID()) {
 				break
 			}
 			if !assertar.Equal(e0, e1) {

@@ -2,13 +2,13 @@ package gossip
 
 import (
 	"fmt"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	notify "github.com/ethereum/go-ethereum/event"
@@ -31,7 +31,6 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/gossip/gasprice"
 	"github.com/Fantom-foundation/go-lachesis/gossip/occuredtxs"
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/lachesis"
 	"github.com/Fantom-foundation/go-lachesis/lachesis/params"
@@ -61,7 +60,7 @@ func (f *ServiceFeed) SubscribeNewPack(ch chan<- idx.Pack) notify.Subscription {
 	return f.scope.Track(f.newPack.Subscribe(ch))
 }
 
-func (f *ServiceFeed) SubscribeNewEmitted(ch chan<- *inter.Event) notify.Subscription {
+func (f *ServiceFeed) SubscribeNewEmitted(ch chan<- *dag.Event) notify.Subscription {
 	return f.scope.Track(f.newEmittedEvent.Subscribe(ch))
 }
 
@@ -94,7 +93,7 @@ type Service struct {
 	node                *node.ServiceContext
 	store               *Store
 	app                 *app.Store
-	engine              Consensus
+	engine              lachesis.Consensus
 	engineMu            *sync.RWMutex
 	emitter             *Emitter
 	txpool              *evmcore.TxPool
@@ -120,7 +119,7 @@ type Service struct {
 	logger.Instance
 }
 
-func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine Consensus) (*Service, error) {
+func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine lachesis.Consensus) (*Service, error) {
 	svc := &Service{
 		config: config,
 
@@ -144,7 +143,7 @@ func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine C
 		engine:       engine,
 		processEvent: svc.processEvent,
 	}
-	svc.engine.Bootstrap(inter.ConsensusCallbacks{
+	svc.engine.Bootstrap(lachesis.ConsensusCallbacks{
 		ApplyBlock:              svc.applyBlock,
 		SelectValidatorsGroup:   svc.selectValidatorsGroup,
 		OnEventConfirmed:        svc.onEventConfirmed,
@@ -179,12 +178,12 @@ func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine C
 }
 
 // GetEngine returns service's engine
-func (s *Service) GetEngine() Consensus {
+func (s *Service) GetEngine() lachesis.Consensus {
 	return s.engine
 }
 
 // makeCheckers builds event checkers
-func makeCheckers(net *lachesis.Config, heavyCheckReader *HeavyCheckReader, gasPowerCheckReader *GasPowerCheckReader, engine Consensus, store *Store) *eventcheck.Checkers {
+func makeCheckers(net *lachesis.Config, heavyCheckReader *HeavyCheckReader, gasPowerCheckReader *GasPowerCheckReader, engine lachesis.Consensus, store *Store) *eventcheck.Checkers {
 	// create signatures checker
 	ledgerID := net.EvmChainConfig().ChainID
 	heavyCheck := heavycheck.NewDefault(&net.Dag, heavyCheckReader, types.NewEIP155Signer(ledgerID))
@@ -216,7 +215,7 @@ func (s *Service) makeEmitter() *Emitter {
 			App:         s.app,
 			Txpool:      s.txpool,
 			OccurredTxs: s.occurredTxs,
-			OnEmitted: func(emitted *inter.Event) {
+			OnEmitted: func(emitted *dag.Event) {
 				// s.engineMu is locked here
 
 				err := s.engine.ProcessEvent(emitted)
@@ -235,7 +234,7 @@ func (s *Service) makeEmitter() *Emitter {
 			PeersNum: func() int {
 				return s.pm.peers.Len()
 			},
-			AddVersion: func(e *inter.Event) *inter.Event {
+			AddVersion: func(e *dag.Event) *dag.Event {
 				// serialization version
 				e.Version = 0
 				// node version
@@ -294,7 +293,7 @@ func (s *Service) Start(srv *p2p.Server) error {
 	// Start the RPC service
 	s.netRPCService = ethapi.NewPublicNetAPI(srv, s.config.Net.NetworkID)
 
-	var genesis common.Hash
+	var genesis hash.Hash
 	genesis = s.engine.GetGenesisHash()
 	s.Topic = discv5.Topic("lachesis@" + genesis.Hex())
 

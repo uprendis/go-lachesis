@@ -1,4 +1,4 @@
-package inter
+package dag
 
 import (
 	"strings"
@@ -25,7 +25,7 @@ func (ee Events) ByParents() (res Events) {
 	exists := hash.EventsSet{}
 	for i, e := range ee {
 		unsorted[i] = e
-		exists.Add(e.Hash())
+		exists.Add(e.ID())
 	}
 	ready := hash.EventsSet{}
 	for len(unsorted) > 0 {
@@ -40,7 +40,7 @@ func (ee Events) ByParents() (res Events) {
 
 			res = append(res, e)
 			unsorted = append(unsorted[0:i], unsorted[i+1:]...)
-			ready.Add(e.Hash())
+			ready.Add(e.ID())
 			break
 		}
 	}

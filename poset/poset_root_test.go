@@ -1,13 +1,14 @@
 package poset
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 )
 
@@ -264,20 +265,20 @@ func testSpecialNamedRoots(t *testing.T, scheme string) {
 	}
 
 	// get nodes only
-	nodes, _, _ := inter.ASCIIschemeToDAG(scheme)
+	nodes, _, _ := tdag.ASCIIschemeToDAG(scheme)
 	// init poset
 	p, _, input := FakePoset("", nodes)
 
 	// process events
-	_, _, names := inter.ASCIIschemeForEach(scheme, inter.ForEachEvent{
-		Process: func(e *inter.Event, name string) {
+	_, _, names := tdag.ASCIIschemeForEach(scheme, tdag.ForEachEvent{
+		Process: func(e *dag.Event, name string) {
 			input.SetEvent(e)
 			assertar.NoError(
 				p.ProcessEvent(e))
 			assertar.NoError(
-				flushDb(p, e.Hash()))
+				flushDb(p, e.ID()))
 		},
-		Build: func(e *inter.Event, name string) *inter.Event {
+		Build: func(e *dag.Event, name string) *dag.Event {
 			e.Epoch = p.GetEpoch()
 			e = p.Prepare(e)
 
@@ -311,20 +312,20 @@ func codegen4PosetRandomRoot() {
 		dag = append(dag, ee...)
 		for _, e := range ee {
 			input.SetEvent(e)
-			p.PushEventSync(e.Hash())
+			p.PushEventSync(e.ID())
 		}
 	}
 
 	// set event names
 	for _, e := range dag {
-		frame := p.FrameOfEvent(e.Hash())
-		_, isRoot := frame.Roots[e.Creator][e.Hash()]
-		oldName := hash.GetEventName(e.Hash())
+		frame := p.FrameOfEvent(e.ID())
+		_, isRoot := frame.Roots[e.Creator][e.ID()]
+		oldName := hash.GetEventName(e.ID())
 		newName := fmt.Sprintf("%s%d.%02d", oldName[0:1], frame.Index, e.Seq)
 		if isRoot {
 			newName = strings.ToUpper(newName[0:1]) + newName[1:]
 		}
-		hash.SetEventName(e.Hash(), newName)
+		hash.SetEventName(e.ID(), newName)
 	}
 
 	fmt.Println(inter.DAGtoASCIIscheme(dag))

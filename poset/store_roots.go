@@ -2,9 +2,9 @@ package poset
 
 import (
 	"bytes"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/poset/election"
 )
@@ -19,13 +19,13 @@ func rootRecordBytes(r *election.RootAndSlot) []byte {
 
 // AddRoot stores the new root
 // Not safe for concurrent use due to complex mutable cache!
-func (s *Store) AddRoot(root *inter.Event) {
+func (s *Store) AddRoot(root *dag.Event) {
 	r := election.RootAndSlot{
 		Slot: election.Slot{
 			Frame:     root.Frame,
 			Validator: root.Creator,
 		},
-		ID: root.Hash(),
+		ID: root.ID(),
 	}
 
 	if err := s.epochTable.Roots.Put(rootRecordBytes(&r), []byte{}); err != nil {

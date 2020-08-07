@@ -32,7 +32,7 @@ type Reader interface {
 // blocks. Suitable for both light and full clients.
 type Oracle struct {
 	backend   Reader
-	lastHead  common.Hash
+	lastHead  hash.Hash
 	lastPrice *big.Int
 	cacheLock sync.RWMutex
 	fetchLock sync.Mutex

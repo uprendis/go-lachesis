@@ -2,6 +2,7 @@ package poset
 
 import (
 	"bytes"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"sort"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
@@ -33,7 +34,7 @@ func (p *Poset) fareTimestamps(
 	frameLamportPeriod := idx.MaxLamport(highestLamport-lowestLamport+1, 1)
 
 	// calculate difference between Atropos's median time and previous Atropos's consensus time (almost the same as previous median time)
-	nowMedianTime := p.GetEventHeader(p.EpochN, atropos).MedianTime
+	nowMedianTime := p.GetEvent(p.EpochN, atropos).MedianTime
 	frameTimePeriod := inter.MaxTimestamp(nowMedianTime-lastConsensusTime, 1)
 	if lastConsensusTime > nowMedianTime {
 		frameTimePeriod = 1
@@ -60,7 +61,7 @@ func (p *Poset) fareTimestamps(
 
 // fareOrdering orders the events
 func (p *Poset) fareOrdering(
-	unordered []*inter.EventHeaderData,
+	unordered []*dag.Event,
 ) (
 	ids hash.Events,
 ) {
@@ -72,13 +73,13 @@ func (p *Poset) fareOrdering(
 			return a.Lamport < b.Lamport
 		}
 
-		return bytes.Compare(a.Hash().Bytes(), b.Hash().Bytes()) < 0
+		return bytes.Compare(a.ID().Bytes(), b.ID().Bytes()) < 0
 	})
 	ordered := unordered
 
 	ids = make(hash.Events, len(ordered))
 	for i, e := range ordered {
-		ids[i] = e.Hash()
+		ids[i] = e.ID()
 	}
 
 	return

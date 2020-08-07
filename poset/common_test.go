@@ -3,8 +3,6 @@ package poset
 import (
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/Fantom-foundation/go-lachesis/hash"
 	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
@@ -27,7 +25,7 @@ const (
 type ExtendedPoset struct {
 	*Poset
 
-	blocks map[idx.Block]*inter.Block
+	blocks map[idx.Block]*lachesis.Block
 }
 
 func (p *ExtendedPoset) EventsTillBlock(until idx.Block) hash.Events {
@@ -62,7 +60,7 @@ func FakePoset(namespace string, nodes []idx.StakerID, mods ...memorydb.Mod) (*E
 			Validators: validators,
 			Accounts:   nil,
 		},
-	}, atropos, common.Hash{})
+	}, atropos, hash.Hash{})
 	if err != nil {
 		panic(err)
 	}
@@ -79,18 +77,18 @@ func FakePoset(namespace string, nodes []idx.StakerID, mods ...memorydb.Mod) (*E
 
 	extended := &ExtendedPoset{
 		Poset:  poset,
-		blocks: map[idx.Block]*inter.Block{},
+		blocks: map[idx.Block]*lachesis.Block{},
 	}
 
-	extended.Bootstrap(inter.ConsensusCallbacks{
-		ApplyBlock: func(block *inter.Block, decidedFrame idx.Frame, cheaters inter.Cheaters) (newAppHash common.Hash, sealEpoch bool) {
+	extended.Bootstrap(lachesis.ConsensusCallbacks{
+		ApplyBlock: func(block *lachesis.Block, decidedFrame idx.Frame, cheaters lachesis.Cheaters) (newAppHash hash.Hash, sealEpoch bool) {
 			// track block events
 			if extended.blocks[block.Index] != nil {
 				extended.Log.Crit("Created block twice")
 			}
 			extended.blocks[block.Index] = block
 
-			return common.Hash{}, false
+			return hash.Hash{}, false
 		},
 	})
 

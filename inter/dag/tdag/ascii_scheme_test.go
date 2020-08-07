@@ -1,6 +1,7 @@
-package inter
+package tdag
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -85,7 +86,7 @@ func TestDAGtoASCIIschemeRand(t *testing.T) {
 	}
 
 	for _, e0 := range src {
-		n := e0.Hash().String()
+		n := e0.ID().String()
 		e1 := names[n]
 
 		parents0 := edges2text(e0)
@@ -398,7 +399,7 @@ func testDAGtoASCIIschemeOptimisation(t *testing.T, origScheme string, refs map[
 	checkParents(t, named, refs)
 }
 
-func checkParents(t *testing.T, named map[string]*Event, expected map[string][]string) {
+func checkParents(t *testing.T, named map[string]*dag.Event, expected map[string][]string) {
 	assertar := assert.New(t)
 
 	for n, e1 := range named {
@@ -418,7 +419,7 @@ func checkParents(t *testing.T, named map[string]*Event, expected map[string][]s
 	}
 }
 
-func edges2text(e *Event) map[string]struct{} {
+func edges2text(e *dag.Event) map[string]struct{} {
 	res := make(map[string]struct{}, len(e.Parents))
 	for _, p := range e.Parents {
 		res[p.String()] = struct{}{}

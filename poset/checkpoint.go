@@ -1,11 +1,10 @@
 package poset
 
 import (
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
+	"github.com/Fantom-foundation/go-lachesis/lachesis"
 	"github.com/Fantom-foundation/go-lachesis/poset/election"
 	"github.com/Fantom-foundation/go-lachesis/vector"
 )
@@ -16,7 +15,7 @@ type Checkpoint struct {
 	LastDecidedFrame idx.Frame
 	LastBlockN       idx.Block
 	LastAtropos      hash.Event
-	AppHash          common.Hash
+	AppHash          hash.Hash
 }
 
 /*
@@ -29,7 +28,7 @@ func (p *Poset) saveCheckpoint() {
 }
 
 // Bootstrap restores poset's state from store.
-func (p *Poset) Bootstrap(callback inter.ConsensusCallbacks) {
+func (p *Poset) Bootstrap(callback lachesis.ConsensusCallbacks) {
 	if p.Checkpoint != nil {
 		return
 	}
@@ -44,8 +43,8 @@ func (p *Poset) Bootstrap(callback inter.ConsensusCallbacks) {
 
 	// restore current epoch
 	p.loadEpoch()
-	p.vecClock = vector.NewIndex(p.dag.VectorClockConfig, p.Validators, p.store.epochTable.VectorIndex, func(id hash.Event) *inter.EventHeaderData {
-		return p.input.GetEventHeader(p.EpochN, id)
+	p.vecClock = vector.NewIndex(p.dag.VectorClockConfig, p.Validators, p.store.epochTable.VectorIndex, func(id hash.Event) *dag.Event {
+		return p.input.GetEvent(p.EpochN, id)
 	})
 	p.election = election.New(p.Validators, p.LastDecidedFrame+1, p.vecClock.ForklessCause, p.store.GetFrameRoots)
 

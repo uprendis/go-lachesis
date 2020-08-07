@@ -1,4 +1,4 @@
-package inter
+package lachesis
 
 import (
 	"github.com/ethereum/go-ethereum/rlp"

@@ -2,15 +2,15 @@ package vector
 
 import (
 	"errors"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 )
 
 // dfsSubgraph iterates all the event which are observed by head, and accepted by a filter
 // Excluding head
 // filter MAY BE called twice for the same event.
-func (vi *Index) dfsSubgraph(head *inter.EventHeaderData, walk func(hash.Event) (godeeper bool)) error {
+func (vi *Index) dfsSubgraph(head *dag.Event, walk func(hash.Event) (godeeper bool)) error {
 	stack := make(hash.EventsStack, 0, vi.validators.Len()*5)
 
 	// first element

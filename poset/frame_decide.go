@@ -1,23 +1,22 @@
 package poset
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/lachesis"
 	"math"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 )
 
-func (p *Poset) confirmEvents(frame idx.Frame, atropos hash.Event, onEventConfirmed func(*inter.EventHeaderData)) {
-	err := p.dfsSubgraph(atropos, func(header *inter.EventHeaderData) bool {
-		decidedFrame := p.store.GetEventConfirmedOn(header.Hash())
+func (p *Poset) confirmEvents(frame idx.Frame, atropos hash.Event, onEventConfirmed func(*dag.Event)) {
+	err := p.dfsSubgraph(atropos, func(header *dag.Event) bool {
+		decidedFrame := p.store.GetEventConfirmedOn(header.ID())
 		if decidedFrame != 0 {
 			return false
 		}
 		// mark all the walked events as confirmed
-		p.store.SetEventConfirmedOn(header.Hash(), frame)
+		p.store.SetEventConfirmedOn(header.ID(), frame)
 		if onEventConfirmed != nil {
 			onEventConfirmed(header)
 		}
@@ -28,8 +27,8 @@ func (p *Poset) confirmEvents(frame idx.Frame, atropos hash.Event, onEventConfir
 	}
 }
 
-func (p *Poset) confirmBlock(frame idx.Frame, atropos hash.Event) (block *inter.Block, cheaters []idx.StakerID) {
-	blockEvents := make([]*inter.EventHeaderData, 0, 50*p.Validators.Len())
+func (p *Poset) confirmBlock(frame idx.Frame, atropos hash.Event) (block *lachesis.Block, cheaters []idx.StakerID) {
+	blockEvents := make([]*dag.Event, 0, 50*p.Validators.Len())
 
 	atroposHighestBefore := p.vecClock.GetHighestBeforeAllBranches(atropos)
 	var highestLamport idx.Lamport
@@ -44,7 +43,7 @@ func (p *Poset) confirmBlock(frame idx.Frame, atropos hash.Event) (block *inter.
 		}
 	}
 
-	p.confirmEvents(frame, atropos, func(confirmedEvent *inter.EventHeaderData) {
+	p.confirmEvents(frame, atropos, func(confirmedEvent *dag.Event) {
 		confirmedNum++
 
 		// track highest and lowest Lamports
@@ -86,7 +85,7 @@ func (p *Poset) confirmBlock(frame idx.Frame, atropos hash.Event) (block *inter.
 	p.store.SetFrameInfo(p.EpochN, frame, &frameInfo)
 
 	// block building
-	block = inter.NewBlock(p.Checkpoint.LastBlockN+1, frameInfo.LastConsensusTime, atropos, p.Checkpoint.LastAtropos, orderedBlockEvents)
+	block = lachesis.NewBlock(p.Checkpoint.LastBlockN+1, frameInfo.LastConsensusTime, atropos, p.Checkpoint.LastAtropos, orderedBlockEvents)
 	return block, cheaters
 }
 
@@ -102,7 +101,7 @@ func (p *Poset) onFrameDecided(frame idx.Frame, atropos hash.Event) bool {
 
 	// new checkpoint
 	var sealEpoch bool
-	var appHash common.Hash
+	var appHash hash.Hash
 	p.Checkpoint.LastBlockN++
 	if p.callback.ApplyBlock != nil {
 		appHash, sealEpoch = p.callback.ApplyBlock(block, frame, cheaters)
@@ -140,8 +139,8 @@ func (p *Poset) sealEpoch() {
 	p.store.RecreateEpochDb(p.EpochN)
 
 	// reset election & vectorindex to new epoch db
-	p.vecClock.Reset(p.Validators, p.store.epochTable.VectorIndex, func(id hash.Event) *inter.EventHeaderData {
-		return p.input.GetEventHeader(p.EpochN, id)
+	p.vecClock.Reset(p.Validators, p.store.epochTable.VectorIndex, func(id hash.Event) *dag.Event {
+		return p.input.GetEvent(p.EpochN, id)
 	})
 	p.election.Reset(p.Validators, firstFrame)
 

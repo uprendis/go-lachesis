@@ -1,6 +1,8 @@
 package poset
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
 	"math/rand"
 	"testing"
 
@@ -8,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/logger"
 )
@@ -19,7 +20,7 @@ func TestPoset(t *testing.T) {
 	assertar := assert.New(t)
 
 	const posetCount = 3
-	nodes := inter.GenNodes(5)
+	nodes := tdag.GenNodes(5)
 
 	posets := make([]*ExtendedPoset, 0, posetCount)
 	inputs := make([]*EventStore, 0, posetCount)
@@ -33,18 +34,18 @@ func TestPoset(t *testing.T) {
 	}
 
 	// create events on poset0
-	var ordered inter.Events
-	inter.ForEachRandEvent(nodes, int(posets[0].dag.MaxEpochBlocks)-1, 3, nil, inter.ForEachEvent{
-		Process: func(e *inter.Event, name string) {
+	var ordered dag.Events
+	tdag.ForEachRandEvent(nodes, int(posets[0].dag.MaxEpochBlocks)-1, 3, nil, tdag.ForEachEvent{
+		Process: func(e *dag.Event, name string) {
 			ordered = append(ordered, e)
 
 			inputs[0].SetEvent(e)
 			assertar.NoError(
 				posets[0].ProcessEvent(e))
 			assertar.NoError(
-				flushDb(posets[0], e.Hash()))
+				flushDb(posets[0], e.ID()))
 		},
-		Build: func(e *inter.Event, name string) *inter.Event {
+		Build: func(e *dag.Event, name string) *dag.Event {
 			e.Epoch = 1
 			if e.Seq%2 != 0 {
 				e.Transactions = append(e.Transactions, &types.Transaction{})
@@ -64,7 +65,7 @@ func TestPoset(t *testing.T) {
 			assertar.NoError(
 				posets[i].ProcessEvent(e))
 			assertar.NoError(
-				flushDb(posets[i], e.Hash()))
+				flushDb(posets[i], e.ID()))
 		}
 	}
 
@@ -74,8 +75,8 @@ func TestPoset(t *testing.T) {
 }
 
 // reorder events, but ancestors are before it's descendants.
-func reorder(events inter.Events) inter.Events {
-	unordered := make(inter.Events, len(events))
+func reorder(events dag.Events) dag.Events {
+	unordered := make(dag.Events, len(events))
 	for i, j := range rand.Perm(len(events)) {
 		unordered[j] = events[i]
 	}

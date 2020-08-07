@@ -2,6 +2,7 @@ package heavycheck
 
 import (
 	"errors"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"runtime"
 	"sync"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/epochcheck"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/lachesis"
 )
@@ -49,8 +49,8 @@ type Checker struct {
 }
 
 type TaskData struct {
-	Events inter.Events // events to validate
-	Result []error      // resulting errors of events, nil if ok
+	Events dag.Events // events to validate
+	Result []error    // resulting errors of events, nil if ok
 
 	onValidated OnValidatedFn
 }
@@ -95,7 +95,7 @@ func (v *Checker) Overloaded() bool {
 	return len(v.tasksQ) > maxQueuedTasks/2
 }
 
-func (v *Checker) Enqueue(events inter.Events, onValidated OnValidatedFn) error {
+func (v *Checker) Enqueue(events dag.Events, onValidated OnValidatedFn) error {
 	// divide big batch into smaller ones
 	for start := 0; start < len(events); start += maxBatch {
 		end := len(events)
@@ -117,7 +117,7 @@ func (v *Checker) Enqueue(events inter.Events, onValidated OnValidatedFn) error 
 }
 
 // Validate event
-func (v *Checker) Validate(e *inter.Event) error {
+func (v *Checker) Validate(e *dag.Event) error {
 	addrs, epoch := v.reader.GetEpochPubKeys()
 	if e.Epoch != epoch {
 		return epochcheck.ErrNotRelevant

@@ -1,16 +1,16 @@
 package poset
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/kvdb/flushable"
@@ -50,7 +50,7 @@ func benchmarkStore(b *testing.B) {
 	store := NewStore(dbs, DefaultStoreConfig())
 	defer store.Close()
 
-	nodes := inter.GenNodes(5)
+	nodes := tdag.GenNodes(5)
 
 	p := benchPoset(nodes, input, store)
 
@@ -70,19 +70,19 @@ func benchmarkStore(b *testing.B) {
 	maxEpoch := idx.Epoch(b.N) + 1
 	for epoch := idx.Epoch(1); epoch <= maxEpoch; epoch++ {
 		r := rand.New(rand.NewSource(int64((epoch))))
-		_ = inter.ForEachRandEvent(nodes, int(p.dag.MaxEpochBlocks*3), 3, r, inter.ForEachEvent{
-			Process: func(e *inter.Event, name string) {
+		_ = tdag.ForEachRandEvent(nodes, int(p.dag.MaxEpochBlocks*3), 3, r, tdag.ForEachEvent{
+			Process: func(e *dag.Event, name string) {
 				input.SetEvent(e)
 				err := p.ProcessEvent(e)
 				if err != nil {
 					panic(err)
 				}
-				err = dbs.Flush(e.Hash().Bytes())
+				err = dbs.Flush(e.ID().Bytes())
 				if err != nil {
 					panic(err)
 				}
 			},
-			Build: func(e *inter.Event, name string) *inter.Event {
+			Build: func(e *dag.Event, name string) *dag.Event {
 				e.Epoch = epoch
 				if e.Seq%2 != 0 {
 					e.Transactions = append(e.Transactions, &types.Transaction{})
@@ -109,14 +109,14 @@ func benchPoset(nodes []idx.StakerID, input EventSource, store *Store) *Poset {
 			Validators: validators,
 			Accounts:   nil,
 		},
-	}, hash.Event{}, common.Hash{})
+	}, hash.Event{}, hash.Hash{})
 	if err != nil {
 		panic(err)
 	}
 
 	dag := lachesis.FakeNetDagConfig()
 	poset := New(dag, store, input)
-	poset.Bootstrap(inter.ConsensusCallbacks{})
+	poset.Bootstrap(lachesis.ConsensusCallbacks{})
 
 	return poset
 }

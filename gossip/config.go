@@ -53,7 +53,7 @@ type (
 	StoreConfig struct {
 		// Cache size for Events.
 		EventsCacheSize int
-		// Cache size for EventHeaderData (Epoch db).
+		// Cache size for Event (Epoch db).
 		EventsHeadersCacheSize int
 		// Cache size for Block.
 		BlockCacheSize int

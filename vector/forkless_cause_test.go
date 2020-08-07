@@ -2,6 +2,8 @@ package vector
 
 import (
 	"fmt"
+	dag2 "github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -40,20 +42,20 @@ a0_1(3)  b0_1     c0_1     d0_1     e0_1     f0_1     g0_1     h0_1     i0_1    
 func benchForklessCauseProcess(b *testing.B, dag string, idx *int) {
 	logger.SetTestMode(b)
 
-	nodes, _, _ := inter.ASCIIschemeToDAG(dag)
+	nodes, _, _ := tdag.ASCIIschemeToDAG(dag)
 	validators := pos.EqualStakeValidators(nodes, 1)
 
-	events := make(map[hash.Event]*inter.EventHeaderData)
-	getEvent := func(id hash.Event) *inter.EventHeaderData {
+	events := make(map[hash.Event]*dag2.Event)
+	getEvent := func(id hash.Event) *dag2.Event {
 		return events[id]
 	}
 
 	vi := NewIndex(DefaultIndexConfig(), validators, memorydb.New(), getEvent)
 
-	_, _, named := inter.ASCIIschemeForEach(dag, inter.ForEachEvent{
-		Process: func(e *inter.Event, name string) {
-			events[e.Hash()] = &e.EventHeaderData
-			vi.Add(&e.EventHeaderData)
+	_, _, named := tdag.ASCIIschemeForEach(dag, tdag.ForEachEvent{
+		Process: func(e *dag2.Event, name string) {
+			events[e.ID()] = &e.Event
+			vi.Add(&e.Event)
 			vi.Flush()
 		},
 	})
@@ -62,8 +64,8 @@ func benchForklessCauseProcess(b *testing.B, dag string, idx *int) {
 	b.StartTimer()
 	for _, ev := range named {
 		for _, by := range named {
-			who := by.Hash()
-			whom := ev.Hash()
+			who := by.ID()
+			whom := ev.ID()
 			vi.ForklessCause(who, whom)
 			if *idx > b.N {
 				b.StopTimer()
@@ -125,20 +127,20 @@ func testForklessCaused(t *testing.T, dag string) {
 	logger.SetTestMode(t)
 	assertar := assert.New(t)
 
-	nodes, _, _ := inter.ASCIIschemeToDAG(dag)
+	nodes, _, _ := tdag.ASCIIschemeToDAG(dag)
 	validators := pos.EqualStakeValidators(nodes, 1)
 
-	events := make(map[hash.Event]*inter.EventHeaderData)
-	getEvent := func(id hash.Event) *inter.EventHeaderData {
+	events := make(map[hash.Event]*dag2.Event)
+	getEvent := func(id hash.Event) *dag2.Event {
 		return events[id]
 	}
 
 	vi := NewIndex(DefaultIndexConfig(), validators, memorydb.New(), getEvent)
 
-	_, _, named := inter.ASCIIschemeForEach(dag, inter.ForEachEvent{
-		Process: func(e *inter.Event, name string) {
-			events[e.Hash()] = &e.EventHeaderData
-			vi.Add(&e.EventHeaderData)
+	_, _, named := tdag.ASCIIschemeForEach(dag, tdag.ForEachEvent{
+		Process: func(e *dag2.Event, name string) {
+			events[e.ID()] = &e.Event
+			vi.Add(&e.Event)
 			vi.Flush()
 		},
 	})
@@ -149,8 +151,8 @@ func testForklessCaused(t *testing.T, dag string) {
 		for dsc, by := range named {
 			level, _ := decode(dsc)
 
-			who := by.Hash()
-			whom := ev.Hash()
+			who := by.ID()
+			whom := ev.ID()
 			if !assertar.Equal(
 				bylevel > 0 && bylevel <= level,
 				vi.ForklessCause(who, whom),
@@ -433,17 +435,17 @@ func TestForklessCausedRandom(t *testing.T) {
 		"d019": map[string]struct{}{"a000": {}, "a001": {}, "a002": {}, "a003": {}, "a004": {}, "a005": {}, "a006": {}, "a007": {}, "a008": {}, "a009": {}, "a010": {}, "a011": {}, "a012": {}, "a013": {}, "a014": {}, "a015": {}, "a016": {}, "a017": {}, "a018": {}, "a019": {}, "b000": {}, "b001": {}, "b002": {}, "b003": {}, "b004": {}, "b005": {}, "b006": {}, "b007": {}, "b008": {}, "b009": {}, "b010": {}, "b011": {}, "b012": {}, "b013": {}, "b014": {}, "b015": {}, "b016": {}, "b017": {}, "b018": {}, "c000": {}, "c001": {}, "c002": {}, "c003": {}, "c004": {}, "c005": {}, "c006": {}, "c007": {}, "c008": {}, "c009": {}, "c010": {}, "c011": {}, "c012": {}, "c013": {}, "c014": {}, "c015": {}, "c016": {}, "c017": {}, "c018": {}, "d000": {}, "d001": {}, "d002": {}, "d003": {}, "d004": {}, "d005": {}, "d006": {}, "d007": {}, "d008": {}, "d009": {}, "d010": {}, "d011": {}, "d012": {}, "d013": {}, "d014": {}, "d015": {}, "d016": {}, "d017": {}, "d018": {}},
 	}
 
-	ordered := make([]*inter.Event, 0)
-	nodes, _, named := inter.ASCIIschemeForEach(dag, inter.ForEachEvent{
-		Process: func(e *inter.Event, name string) {
+	ordered := make([]*dag2.Event, 0)
+	nodes, _, named := tdag.ASCIIschemeForEach(dag, tdag.ForEachEvent{
+		Process: func(e *dag2.Event, name string) {
 			ordered = append(ordered, e)
 		},
 	})
 
 	validators := pos.EqualStakeValidators(nodes, 1)
 
-	events := make(map[hash.Event]*inter.EventHeaderData)
-	getEvent := func(id hash.Event) *inter.EventHeaderData {
+	events := make(map[hash.Event]*dag2.Event)
+	getEvent := func(id hash.Event) *dag2.Event {
 		return events[id]
 	}
 
@@ -451,8 +453,8 @@ func TestForklessCausedRandom(t *testing.T) {
 
 	// push
 	for _, e := range ordered {
-		events[e.Hash()] = &e.EventHeaderData
-		vi.Add(&e.EventHeaderData)
+		events[e.ID()] = &e.Event
+		vi.Add(&e.Event)
 		vi.Flush()
 	}
 
@@ -462,8 +464,8 @@ func TestForklessCausedRandom(t *testing.T) {
 			_, expect := relations[e1name][e2name]
 			if !assertar.Equal(
 				expect,
-				vi.ForklessCause(e1.Hash(), e2.Hash()),
-				fmt.Sprintf("%s forkless sees %s", e1.Hash(), e2.Hash()),
+				vi.ForklessCause(e1.ID(), e2.ID()),
+				fmt.Sprintf("%s forkless sees %s", e1.ID(), e2.ID()),
 			) {
 				return
 			}
@@ -477,7 +479,7 @@ type eventSlot struct {
 }
 
 // naive implementation of fork detection, O(n)
-func testForksDetected(vi *Index, head *inter.EventHeaderData) (cheaters map[idx.StakerID]bool, err error) {
+func testForksDetected(vi *Index, head *dag2.Event) (cheaters map[idx.StakerID]bool, err error) {
 	cheaters = map[idx.StakerID]bool{}
 	visited := hash.EventsSet{}
 	detected := map[eventSlot]int{}
@@ -496,7 +498,7 @@ func testForksDetected(vi *Index, head *inter.EventHeaderData) (cheaters map[idx
 		detected[slot]++
 		return true
 	}
-	onWalk(head.Hash())
+	onWalk(head.ID())
 	err = vi.dfsSubgraph(head, onWalk)
 	for s, count := range detected {
 		if count > 1 {
@@ -507,7 +509,7 @@ func testForksDetected(vi *Index, head *inter.EventHeaderData) (cheaters map[idx
 }
 
 func TestRandomForksSanity(t *testing.T) {
-	nodes := inter.GenNodes(8)
+	nodes := tdag.GenNodes(8)
 	cheaters := []idx.StakerID{nodes[0], nodes[1], nodes[2]}
 
 	validatorsBuilder := pos.NewBuilder()
@@ -520,21 +522,21 @@ func TestRandomForksSanity(t *testing.T) {
 	validatorsBuilder.Set(nodes[4], pos.Stake(3))
 	validators := validatorsBuilder.Build()
 
-	processed := make(map[hash.Event]*inter.EventHeaderData)
-	getEvent := func(id hash.Event) *inter.EventHeaderData {
+	processed := make(map[hash.Event]*dag2.Event)
+	getEvent := func(id hash.Event) *dag2.Event {
 		return processed[id]
 	}
 
 	vi := NewIndex(DefaultIndexConfig(), validators, memorydb.New(), getEvent)
 
 	// Many forks from each node in large graph, so probability of not seeing a fork is negligible
-	events := inter.ForEachRandFork(nodes, cheaters, 300, 4, 30, nil, inter.ForEachEvent{
-		Process: func(e *inter.Event, name string) {
-			if _, ok := processed[e.Hash()]; ok {
+	events := tdag.ForEachRandFork(nodes, cheaters, 300, 4, 30, nil, tdag.ForEachEvent{
+		Process: func(e *dag2.Event, name string) {
+			if _, ok := processed[e.ID()]; ok {
 				return
 			}
-			processed[e.Hash()] = &e.EventHeaderData
-			vi.Add(&e.EventHeaderData)
+			processed[e.ID()] = &e.Event
+			vi.Add(&e.Event)
 		},
 	})
 
@@ -546,7 +548,7 @@ func TestRandomForksSanity(t *testing.T) {
 	idxs := validatorsBuilder.Build().Idxs()
 	for _, node := range nodes {
 		ee := events[node]
-		highestBefore := vi.GetHighestBeforeSeq(ee[len(ee)-1].Hash())
+		highestBefore := vi.GetHighestBeforeSeq(ee[len(ee)-1].ID())
 		for n, cheater := range nodes {
 			branchSeq := highestBefore.Get(idxs[cheater])
 			isCheater := n < len(cheaters)
@@ -639,29 +641,29 @@ func TestRandomForks(t *testing.T) {
 
 			r := rand.New(rand.NewSource(int64(i)))
 
-			nodes := inter.GenNodes(test.nodesNum)
+			nodes := tdag.GenNodes(test.nodesNum)
 			cheaters := nodes[:test.cheatersNum]
 
 			validators := pos.EqualStakeValidators(nodes, 1)
 
-			processedArr := inter.Events{}
-			processed := make(map[hash.Event]*inter.EventHeaderData)
-			getEvent := func(id hash.Event) *inter.EventHeaderData {
+			processedArr := dag2.Events{}
+			processed := make(map[hash.Event]*dag2.Event)
+			getEvent := func(id hash.Event) *dag2.Event {
 				return processed[id]
 			}
 
 			vi := NewIndex(DefaultIndexConfig(), validators, memorydb.New(), getEvent)
 
-			_ = inter.ForEachRandFork(nodes, cheaters, test.eventsNum, test.parentsNum, test.forksNum, r, inter.ForEachEvent{
-				Process: func(e *inter.Event, name string) {
-					if _, ok := processed[e.Hash()]; ok {
+			_ = tdag.ForEachRandFork(nodes, cheaters, test.eventsNum, test.parentsNum, test.forksNum, r, tdag.ForEachEvent{
+				Process: func(e *dag2.Event, name string) {
+					if _, ok := processed[e.ID()]; ok {
 						return
 					}
-					processed[e.Hash()] = &e.EventHeaderData
+					processed[e.ID()] = &e.Event
 					processedArr = append(processedArr, e)
-					vi.Add(&e.EventHeaderData)
+					vi.Add(&e.Event)
 				},
-				Build: func(e *inter.Event, name string) *inter.Event {
+				Build: func(e *dag2.Event, name string) *dag2.Event {
 					e.ClaimedTime = inter.Timestamp(r.Intn(testTime))
 					return e
 				},
@@ -671,7 +673,7 @@ func TestRandomForks(t *testing.T) {
 			idxs := validators.Idxs()
 			// check that fork observing is identical to naive version
 			for _, e := range processed {
-				highestBefore := vi.GetHighestBeforeSeq(e.Hash())
+				highestBefore := vi.GetHighestBeforeSeq(e.ID())
 				expectedCheaters, err := testForksDetected(vi, e)
 				assertar.NoError(err)
 
@@ -689,48 +691,48 @@ func TestRandomForks(t *testing.T) {
 			forklessCauseMap := map[kv]bool{}
 			medianTimeMap := map[hash.Event]inter.Timestamp{}
 			for _, a := range processedArr {
-				medianTimeMap[a.Hash()] = vi.MedianTime(a.Hash(), inter.Timestamp(testTime/2))
+				medianTimeMap[a.ID()] = vi.MedianTime(a.ID(), inter.Timestamp(testTime/2))
 				for _, b := range processedArr {
 					pair := kv{
-						a: a.Hash(),
-						b: b.Hash(),
+						a: a.ID(),
+						b: b.ID(),
 					}
-					forklessCauseMap[pair] = vi.ForklessCause(a.Hash(), b.Hash())
+					forklessCauseMap[pair] = vi.ForklessCause(a.ID(), b.ID())
 				}
 			}
 
 			vi.DropNotFlushed() // drops everything, because wasn't flushed
 			for _, e := range processed {
-				assertar.Nil(vi.GetHighestBeforeSeq(e.Hash()))
-				assertar.Nil(vi.GetLowestAfterSeq(e.Hash()))
-				assertar.Nil(vi.GetHighestBeforeTime(e.Hash()))
+				assertar.Nil(vi.GetHighestBeforeSeq(e.ID()))
+				assertar.Nil(vi.GetLowestAfterSeq(e.ID()))
+				assertar.Nil(vi.GetHighestBeforeTime(e.ID()))
 			}
 
 			// check that events re-order doesn't change forklessCause result
 			for reorderTry := 0; reorderTry < test.reorderChecks; reorderTry++ {
 				// re-order events randomly, preserving parents order
-				unordered := make(inter.Events, len(processedArr))
+				unordered := make(dag2.Events, len(processedArr))
 				for i, j := range r.Perm(len(processedArr)) {
 					unordered[i] = processedArr[j]
 				}
 				processedArr = unordered.ByParents()
 
 				for _, a := range processedArr {
-					vi.Add(&a.EventHeaderData)
+					vi.Add(&a.Event)
 				}
 
 				vi.cache.ForklessCause.Purge() // disable cache
 				for _, a := range processedArr {
-					res := vi.MedianTime(a.Hash(), inter.Timestamp(testTime/2))
-					assertar.Equal(medianTimeMap[a.Hash()], res, "%s %d", a.Hash().String(), reorderTry)
+					res := vi.MedianTime(a.ID(), inter.Timestamp(testTime/2))
+					assertar.Equal(medianTimeMap[a.ID()], res, "%s %d", a.ID().String(), reorderTry)
 
 					for _, b := range processedArr {
 						pair := kv{
-							a: a.Hash(),
-							b: b.Hash(),
+							a: a.ID(),
+							b: b.ID(),
 						}
-						res := vi.ForklessCause(a.Hash(), b.Hash())
-						assertar.Equal(forklessCauseMap[pair], res, "%s %s %d", a.Hash().String(), b.Hash().String(), reorderTry)
+						res := vi.ForklessCause(a.ID(), b.ID())
+						assertar.Equal(forklessCauseMap[pair], res, "%s %s %d", a.ID().String(), b.ID().String(), reorderTry)
 					}
 				}
 				vi.DropNotFlushed()
@@ -755,7 +757,7 @@ func codegen4ForklessCausedStability() {
 	orderThenProcess := ordering.EventBuffer(ordering.Callback{
 
 		Process: func(e *inter.Event) {
-			processed[e.Hash()] = e
+			processed[e.ID()] = e
 			vi.Add(e)
 		},
 
@@ -786,10 +788,10 @@ func codegen4ForklessCausedStability() {
 	fmt.Printf("dag := `%s`\n", scheme)
 	fmt.Printf("relations := map[string]map[string]struct{}{\n")
 	for _, e1 := range dag {
-		sees := fmt.Sprintf("\"%s\": map[string]struct{}{", e1.Hash())
+		sees := fmt.Sprintf("\"%s\": map[string]struct{}{", e1.ID())
 		for _, e2 := range dag {
-			if vi.ForklessCause(e1.Hash(), e2.Hash()) {
-				sees = sees + fmt.Sprintf("\"%s\":{},", e2.Hash())
+			if vi.ForklessCause(e1.ID(), e2.ID()) {
+				sees = sees + fmt.Sprintf("\"%s\":{},", e2.ID())
 			}
 		}
 		sees += "},"

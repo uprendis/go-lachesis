@@ -1,13 +1,14 @@
 package poset
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
+	"github.com/Fantom-foundation/go-lachesis/lachesis"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/logger"
 )
@@ -16,15 +17,15 @@ func TestConfirmBlockEvents(t *testing.T) {
 	logger.SetTestMode(t)
 	assertar := assert.New(t)
 
-	nodes := inter.GenNodes(5)
+	nodes := tdag.GenNodes(5)
 	poset, _, input := FakePoset("", nodes)
 
 	var (
 		frames []idx.Frame
-		blocks []*inter.Block
+		blocks []*lachesis.Block
 	)
 	applyBlock := poset.callback.ApplyBlock
-	poset.callback.ApplyBlock = func(block *inter.Block, decidedFrame idx.Frame, cheaters inter.Cheaters) (common.Hash, bool) {
+	poset.callback.ApplyBlock = func(block *lachesis.Block, decidedFrame idx.Frame, cheaters lachesis.Cheaters) (hash.Hash, bool) {
 		frames = append(frames, poset.LastDecidedFrame)
 		blocks = append(blocks, block)
 
@@ -32,16 +33,16 @@ func TestConfirmBlockEvents(t *testing.T) {
 	}
 
 	eventCount := int(poset.dag.MaxEpochBlocks)
-	_ = inter.ForEachRandEvent(nodes, eventCount, 5, nil, inter.ForEachEvent{
-		Process: func(e *inter.Event, name string) {
+	_ = tdag.ForEachRandEvent(nodes, eventCount, 5, nil, tdag.ForEachEvent{
+		Process: func(e *dag.Event, name string) {
 			input.SetEvent(e)
 			assertar.NoError(
 				poset.ProcessEvent(e))
 			assertar.NoError(
-				flushDb(poset, e.Hash()))
+				flushDb(poset, e.ID()))
 
 		},
-		Build: func(e *inter.Event, name string) *inter.Event {
+		Build: func(e *dag.Event, name string) *dag.Event {
 			e.Epoch = idx.Epoch(1)
 			if e.Seq%2 != 0 {
 				e.Transactions = append(e.Transactions, &types.Transaction{})

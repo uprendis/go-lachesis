@@ -60,6 +60,6 @@ func (p *Poset) setEpochValidators(validators *pos.Validators, epoch idx.Epoch) 
 }
 
 // GetGenesisHash returns PrevEpochHash of first epoch.
-func (p *Poset) GetGenesisHash() common.Hash {
+func (p *Poset) GetGenesisHash() hash.Hash {
 	return p.store.GetGenesisHash()
 }

@@ -1,6 +1,8 @@
 package ancestor
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
 	"sort"
 	"strconv"
 	"strings"
@@ -9,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/kvdb/memorydb"
@@ -79,17 +80,17 @@ func testSpecialNamedParents(t *testing.T, asciiScheme string, exp map[int]map[s
 		return
 	}
 
-	ordered := make([]*inter.Event, 0)
-	nodes, _, _ := inter.ASCIIschemeForEach(asciiScheme, inter.ForEachEvent{
-		Process: func(e *inter.Event, name string) {
+	ordered := make([]*dag.Event, 0)
+	nodes, _, _ := tdag.ASCIIschemeForEach(asciiScheme, tdag.ForEachEvent{
+		Process: func(e *dag.Event, name string) {
 			ordered = append(ordered, e)
 		},
 	})
 
 	validators := pos.EqualStakeValidators(nodes, 1)
 
-	events := make(map[hash.Event]*inter.EventHeaderData)
-	getEvent := func(id hash.Event) *inter.EventHeaderData {
+	events := make(map[hash.Event]*dag.Event)
+	getEvent := func(id hash.Event) *dag.Event {
 		return events[id]
 	}
 
@@ -97,12 +98,12 @@ func testSpecialNamedParents(t *testing.T, asciiScheme string, exp map[int]map[s
 
 	// build vector index
 	for _, e := range ordered {
-		events[e.Hash()] = &e.EventHeaderData
-		vecClock.Add(&e.EventHeaderData)
+		events[e.ID()] = &e.Event
+		vecClock.Add(&e.Event)
 	}
 
 	// divide events by stage
-	var stages [][]*inter.Event
+	var stages [][]*dag.Event
 	for _, e := range ordered {
 		name := string(e.Extra)
 		stage := decode(name)
@@ -125,8 +126,8 @@ func testSpecialNamedParents(t *testing.T, asciiScheme string, exp map[int]map[s
 					heads.Erase(p)
 				}
 			}
-			heads.Add(e.Hash())
-			id := e.Hash()
+			heads.Add(e.ID())
+			id := e.ID()
 			tips[e.Creator] = &id
 		}
 

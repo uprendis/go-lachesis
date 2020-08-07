@@ -2,12 +2,12 @@ package basiccheck
 
 import (
 	"errors"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"math"
 
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/lachesis"
 	"github.com/Fantom-foundation/go-lachesis/lachesis/params"
 )
@@ -61,7 +61,7 @@ func (v *Checker) validateTx(tx *types.Transaction) error {
 	return nil
 }
 
-func (v *Checker) checkTxs(e *inter.Event) error {
+func (v *Checker) checkTxs(e *dag.Event) error {
 	for _, tx := range e.Transactions {
 		if err := v.validateTx(tx); err != nil {
 			return err
@@ -70,7 +70,7 @@ func (v *Checker) checkTxs(e *inter.Event) error {
 	return nil
 }
 
-func CalcGasPowerUsed(e *inter.Event, config *lachesis.DagConfig) uint64 {
+func CalcGasPowerUsed(e *dag.Event, config *lachesis.DagConfig) uint64 {
 	txsGas := uint64(0)
 	for _, tx := range e.Transactions {
 		txsGas += tx.Gas()
@@ -85,7 +85,7 @@ func CalcGasPowerUsed(e *inter.Event, config *lachesis.DagConfig) uint64 {
 	return txsGas + parentsGas + extraGas + params.EventGas
 }
 
-func (v *Checker) checkGas(e *inter.Event) error {
+func (v *Checker) checkGas(e *dag.Event) error {
 	if e.GasPowerUsed > params.MaxGasPowerUsed {
 		return ErrTooBigGasUsed
 	}
@@ -96,7 +96,7 @@ func (v *Checker) checkGas(e *inter.Event) error {
 	return nil
 }
 
-func (v *Checker) checkLimits(e *inter.Event) error {
+func (v *Checker) checkLimits(e *dag.Event) error {
 	if len(e.Extra) > params.MaxExtraData {
 		return ErrExtraTooLarge
 	}
@@ -111,7 +111,7 @@ func (v *Checker) checkLimits(e *inter.Event) error {
 	return nil
 }
 
-func (v *Checker) checkInited(e *inter.Event) error {
+func (v *Checker) checkInited(e *dag.Event) error {
 	if e.Seq <= 0 || e.Epoch <= 0 || e.Frame <= 0 || e.Lamport <= 0 {
 		return ErrNotInited // it's unsigned, but check for negative in a case if type will change
 	}
@@ -130,7 +130,7 @@ func (v *Checker) checkInited(e *inter.Event) error {
 }
 
 // Validate event
-func (v *Checker) Validate(e *inter.Event) error {
+func (v *Checker) Validate(e *dag.Event) error {
 	if e.Version != 0 {
 		return ErrVersion
 	}

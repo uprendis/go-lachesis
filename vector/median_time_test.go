@@ -1,6 +1,8 @@
 package vector
 
 import (
+	dag2 "github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,7 +17,7 @@ import (
 func TestMedianTimeOnIndex(t *testing.T) {
 	logger.SetTestMode(t)
 
-	nodes := inter.GenNodes(5)
+	nodes := tdag.GenNodes(5)
 	weights := []pos.Stake{5, 4, 3, 2, 1}
 	validators := pos.ArrayToValidators(nodes, weights)
 
@@ -23,7 +25,7 @@ func TestMedianTimeOnIndex(t *testing.T) {
 
 	assertar := assert.New(t)
 	{ // seq=0
-		e := inter.NewEvent().EventHeaderData.Hash()
+		e := inter.NewEvent().Event.ID()
 		// validator indexes are sorted by stake amount
 		beforeSeq := NewHighestBeforeSeq(validators.Len())
 		beforeTime := NewHighestBeforeTime(validators.Len())
@@ -48,7 +50,7 @@ func TestMedianTimeOnIndex(t *testing.T) {
 	}
 
 	{ // fork seen = true
-		e := inter.NewEvent().EventHeaderData.Hash()
+		e := inter.NewEvent().Event.ID()
 		// validator indexes are sorted by stake amount
 		beforeSeq := NewHighestBeforeSeq(validators.Len())
 		beforeTime := NewHighestBeforeTime(validators.Len())
@@ -73,7 +75,7 @@ func TestMedianTimeOnIndex(t *testing.T) {
 	}
 
 	{ // normal
-		e := inter.NewEvent().EventHeaderData.Hash()
+		e := inter.NewEvent().Event.ID()
 		// validator indexes are sorted by stake amount
 		beforeSeq := NewHighestBeforeSeq(validators.Len())
 		beforeTime := NewHighestBeforeTime(validators.Len())
@@ -159,21 +161,21 @@ func TestMedianTimeOnDAG(t *testing.T) {
 func testMedianTime(t *testing.T, dag string, weights []pos.Stake, claimedTimes map[string]inter.Timestamp, medianTimes map[string]inter.Timestamp, genesis inter.Timestamp) {
 	assertar := assert.New(t)
 
-	var ordered []*inter.Event
-	nodes, _, named := inter.ASCIIschemeForEach(dag, inter.ForEachEvent{
-		Build: func(e *inter.Event, name string) *inter.Event {
+	var ordered []*dag2.Event
+	nodes, _, named := tdag.ASCIIschemeForEach(dag, tdag.ForEachEvent{
+		Build: func(e *dag2.Event, name string) *dag2.Event {
 			e.ClaimedTime = claimedTimes[name]
 			return e
 		},
-		Process: func(e *inter.Event, name string) {
+		Process: func(e *dag2.Event, name string) {
 			ordered = append(ordered, e)
 		},
 	})
 
 	validators := pos.ArrayToValidators(nodes, weights)
 
-	events := make(map[hash.Event]*inter.EventHeaderData)
-	getEvent := func(id hash.Event) *inter.EventHeaderData {
+	events := make(map[hash.Event]*dag2.Event)
+	getEvent := func(id hash.Event) *dag2.Event {
 		return events[id]
 	}
 
@@ -181,8 +183,8 @@ func testMedianTime(t *testing.T, dag string, weights []pos.Stake, claimedTimes 
 
 	// push
 	for _, e := range ordered {
-		events[e.Hash()] = &e.EventHeaderData
-		vi.Add(&e.EventHeaderData)
+		events[e.ID()] = &e.Event
+		vi.Add(&e.Event)
 		vi.Flush()
 	}
 
@@ -192,6 +194,6 @@ func testMedianTime(t *testing.T, dag string, weights []pos.Stake, claimedTimes 
 		if !ok {
 			continue
 		}
-		assertar.Equal(expected, vi.MedianTime(e.Hash(), genesis), name)
+		assertar.Equal(expected, vi.MedianTime(e.ID(), genesis), name)
 	}
 }

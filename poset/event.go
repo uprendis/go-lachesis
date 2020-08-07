@@ -1,9 +1,8 @@
 package poset
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"strings"
-
-	"github.com/Fantom-foundation/go-lachesis/inter"
 )
 
 /*
@@ -12,7 +11,7 @@ import (
 
 // Event is a poset event for internal purpose.
 type Event struct {
-	*inter.Event
+	*dag.Event
 }
 
 /*
@@ -32,8 +31,8 @@ func (ee Events) String() string {
 }
 
 // UnWrap extracts inter.Event.
-func (ee Events) UnWrap() inter.Events {
-	res := make(inter.Events, len(ee))
+func (ee Events) UnWrap() dag.Events {
+	res := make(dag.Events, len(ee))
 	for i, e := range ee {
 		res[i] = e.Event
 	}

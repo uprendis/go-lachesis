@@ -13,12 +13,12 @@ type (
 
 // Bytes gets the byte representation of the index.
 func (t Timestamp) Bytes() []byte {
-	return bigendian.Int64ToBytes(uint64(t))
+	return bigendian.Uint64ToBytes(uint64(t))
 }
 
 // BytesToTimestamp converts bytes to timestamp.
 func BytesToTimestamp(b []byte) Timestamp {
-	return Timestamp(bigendian.BytesToInt64(b))
+	return Timestamp(bigendian.BytesToUint64(b))
 }
 
 func FromUnix(t int64) Timestamp {

@@ -2,8 +2,8 @@ package parentscheck
 
 import (
 	"errors"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/lachesis"
 )
@@ -29,7 +29,7 @@ func New(config *lachesis.DagConfig) *Checker {
 }
 
 // Validate event
-func (v *Checker) Validate(e *inter.Event, parents []*inter.EventHeaderData) error {
+func (v *Checker) Validate(e *dag.Event, parents []*dag.Event) error {
 	if len(e.Parents) != len(parents) {
 		panic("parentscheck: expected event's parents as an argument")
 	}
@@ -61,7 +61,7 @@ func (v *Checker) Validate(e *inter.Event, parents []*inter.EventHeaderData) err
 	}
 	if e.SelfParent() != nil {
 		selfParent := parents[0]
-		if !e.IsSelfParent(selfParent.Hash()) {
+		if !e.IsSelfParent(selfParent.ID()) {
 			// sanity check, self-parent is always first, it's how it's stored
 			return ErrWrongSelfParent
 		}

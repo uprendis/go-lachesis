@@ -2,15 +2,15 @@ package poset
 
 import (
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 )
 
 // EventSource is a callback for getting events from an external storage.
 type EventSource interface {
 	HasEvent(hash.Event) bool
-	GetEvent(hash.Event) *inter.Event
-	GetEventHeader(idx.Epoch, hash.Event) *inter.EventHeaderData
+	GetEvent(hash.Event) *dag.Event
+	GetEvent(idx.Epoch, hash.Event) *dag.Event
 }
 
 /*
@@ -28,7 +28,7 @@ func (p *Poset) GetEvent(h hash.Event) *Event {
 	}
 }
 
-// GetEventHeader returns event header.
-func (p *Poset) GetEventHeader(epoch idx.Epoch, h hash.Event) *inter.EventHeaderData {
-	return p.input.GetEventHeader(epoch, h)
+// GetEvent returns event header.
+func (p *Poset) GetEvent(epoch idx.Epoch, h hash.Event) *dag.Event {
+	return p.input.GetEvent(epoch, h)
 }

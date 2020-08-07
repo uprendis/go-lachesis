@@ -1,13 +1,14 @@
 package poset
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/logger"
@@ -18,7 +19,7 @@ func TestPosetTxn(t *testing.T) {
 
 	var x = pos.Stake(1)
 
-	nodes := inter.GenNodes(5)
+	nodes := tdag.GenNodes(5)
 
 	p, s, in := FakePoset("", nodes)
 	assert.Equal(t,
@@ -39,15 +40,15 @@ func TestPosetTxn(t *testing.T) {
 		return p.Validators
 	}
 
-	_ = inter.ForEachRandEvent(nodes, int(p.dag.MaxEpochBlocks-1), 3, nil, inter.ForEachEvent{
-		Process: func(e *inter.Event, name string) {
+	_ = tdag.ForEachRandEvent(nodes, int(p.dag.MaxEpochBlocks-1), 3, nil, tdag.ForEachEvent{
+		Process: func(e *dag.Event, name string) {
 			in.SetEvent(e)
 			assert.NoError(t,
 				p.ProcessEvent(e))
 			assert.NoError(t,
-				flushDb(p, e.Hash()))
+				flushDb(p, e.ID()))
 		},
-		Build: func(e *inter.Event, name string) *inter.Event {
+		Build: func(e *dag.Event, name string) *dag.Event {
 			e.Epoch = 1
 			e.TxHash = types.DeriveSha(e.Transactions)
 			e = p.Prepare(e)
@@ -55,7 +56,7 @@ func TestPosetTxn(t *testing.T) {
 		},
 	})
 
-	assert.Equal(t, p.PrevEpoch.Hash(), s.GetGenesis().PrevEpoch.Hash())
+	assert.Equal(t, p.PrevEpoch.ID(), s.GetGenesis().PrevEpoch.ID())
 
 	assert.Equal(t, idx.Epoch(0), p.PrevEpoch.Epoch)
 	assert.Equal(t, genesisTime, p.PrevEpoch.Time)

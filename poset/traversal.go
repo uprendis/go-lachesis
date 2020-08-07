@@ -2,12 +2,12 @@ package poset
 
 import (
 	"errors"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 )
 
-type eventFilterFn func(event *inter.EventHeaderData) bool
+type eventFilterFn func(event *dag.Event) bool
 
 // dfsSubgraph iterates all the events which are observed by head, and accepted by a filter.
 // filter MAY BE called twice for the same event.
@@ -17,7 +17,7 @@ func (p *Poset) dfsSubgraph(head hash.Event, filter eventFilterFn) error {
 	for pwalk := &head; pwalk != nil; pwalk = stack.Pop() {
 		walk := *pwalk
 
-		event := p.input.GetEventHeader(p.EpochN, walk)
+		event := p.input.GetEvent(p.EpochN, walk)
 		if event == nil {
 			return errors.New("event not found " + walk.String())
 		}

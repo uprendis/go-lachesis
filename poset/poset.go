@@ -1,11 +1,11 @@
 package poset
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"github.com/pkg/errors"
 
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/epochcheck"
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/lachesis"
 	"github.com/Fantom-foundation/go-lachesis/logger"
@@ -34,7 +34,7 @@ type Poset struct {
 	election *election.Election
 	vecClock *vector.Index
 
-	callback inter.ConsensusCallbacks
+	callback lachesis.ConsensusCallbacks
 
 	epochMu utils.SpinLock // protects p.Validators and p.EpochN
 
@@ -67,19 +67,19 @@ func (p *Poset) LastBlock() (idx.Block, hash.Event) {
 
 // Prepare fills consensus-related fields: Frame, IsRoot, MedianTimestamp, PrevEpochHash
 // returns nil if event should be dropped
-func (p *Poset) Prepare(e *inter.Event) *inter.Event {
+func (p *Poset) Prepare(e *dag.Event) *dag.Event {
 	if err := epochcheck.New(&p.dag, p).Validate(e); err != nil {
 		p.Log.Error("Event prepare error", "err", err, "event", e)
 		return nil
 	}
-	id := e.Hash() // remember, because we change event here
-	p.vecClock.Add(&e.EventHeaderData)
+	id := e.ID() // remember, because we change event here
+	p.vecClock.Add(&e.Event)
 	defer p.vecClock.DropNotFlushed()
 
 	e.Frame, e.IsRoot = p.calcFrameIdx(e, false)
 	e.MedianTime = p.vecClock.MedianTime(id, p.PrevEpoch.Time)
 	if e.Seq <= 1 {
-		e.PrevEpochHash = p.PrevEpoch.Hash()
+		e.PrevEpochHash = p.PrevEpoch.ID()
 	} else {
 		e.PrevEpochHash = hash.Zero
 	}
@@ -88,8 +88,8 @@ func (p *Poset) Prepare(e *inter.Event) *inter.Event {
 }
 
 // checks consensus-related fields: Frame, IsRoot, MedianTimestamp, PrevEpochHash
-func (p *Poset) checkAndSaveEvent(e *inter.Event) error {
-	if e.Seq <= 1 && e.PrevEpochHash != p.PrevEpoch.Hash() {
+func (p *Poset) checkAndSaveEvent(e *dag.Event) error {
+	if e.Seq <= 1 && e.PrevEpochHash != p.PrevEpoch.ID() {
 		return ErrWrongEpochHash
 	}
 	if e.Seq > 1 && e.PrevEpochHash != hash.Zero {
@@ -101,7 +101,7 @@ func (p *Poset) checkAndSaveEvent(e *inter.Event) error {
 		return ErrCheatersObserved
 	}
 
-	p.vecClock.Add(&e.EventHeaderData)
+	p.vecClock.Add(&e.Event)
 	defer p.vecClock.DropNotFlushed()
 
 	// check frame & isRoot
@@ -113,7 +113,7 @@ func (p *Poset) checkAndSaveEvent(e *inter.Event) error {
 		return ErrWrongFrame
 	}
 	// check median timestamp
-	medianTime := p.vecClock.MedianTime(e.Hash(), p.PrevEpoch.Time)
+	medianTime := p.vecClock.MedianTime(e.ID(), p.PrevEpoch.Time)
 	if e.MedianTime != medianTime {
 		return ErrWrongMedianTime
 	}
@@ -128,13 +128,13 @@ func (p *Poset) checkAndSaveEvent(e *inter.Event) error {
 }
 
 // calculates Atropos election for the root, calls p.onFrameDecided if election was decided
-func (p *Poset) handleElection(root *inter.Event) {
+func (p *Poset) handleElection(root *dag.Event) {
 	if root != nil { // if root is nil, then just bootstrap election
 		if !root.IsRoot {
 			return
 		}
 
-		decided := p.processRoot(root.Frame, root.Creator, root.Hash())
+		decided := p.processRoot(root.Frame, root.Creator, root.ID())
 		if decided == nil {
 			return
 		}
@@ -198,7 +198,7 @@ func (p *Poset) processKnownRoots() *election.Res {
 // ProcessEvent takes event into processing.
 // Event order matter: parents first.
 // ProcessEvent is not safe for concurrent use.
-func (p *Poset) ProcessEvent(e *inter.Event) (err error) {
+func (p *Poset) ProcessEvent(e *dag.Event) (err error) {
 	err = epochcheck.New(&p.dag, p).Validate(e)
 	if err != nil {
 		return
@@ -215,11 +215,11 @@ func (p *Poset) ProcessEvent(e *inter.Event) (err error) {
 }
 
 // forklessCausedByQuorumOn returns true if event is forkless caused by 2/3W roots on specified frame
-func (p *Poset) forklessCausedByQuorumOn(e *inter.Event, f idx.Frame) bool {
+func (p *Poset) forklessCausedByQuorumOn(e *dag.Event, f idx.Frame) bool {
 	observedCounter := p.Validators.NewCounter()
 	// check "observing" prev roots only if called by creator, or if creator has marked that event as root
 	for _, it := range p.store.GetFrameRoots(f) {
-		if p.vecClock.ForklessCause(e.Hash(), it.ID) {
+		if p.vecClock.ForklessCause(e.ID(), it.ID) {
 			observedCounter.Count(it.Slot.Validator)
 		}
 		if observedCounter.HasQuorum() {
@@ -232,7 +232,7 @@ func (p *Poset) forklessCausedByQuorumOn(e *inter.Event, f idx.Frame) bool {
 // calcFrameIdx checks root-conditions for new event
 // and returns event's frame.
 // It is not safe for concurrent use.
-func (p *Poset) calcFrameIdx(e *inter.Event, checkOnly bool) (frame idx.Frame, isRoot bool) {
+func (p *Poset) calcFrameIdx(e *dag.Event, checkOnly bool) (frame idx.Frame, isRoot bool) {
 	if len(e.Parents) == 0 {
 		// special case for very first events in the epoch
 		return 1, true
@@ -243,7 +243,7 @@ func (p *Poset) calcFrameIdx(e *inter.Event, checkOnly bool) (frame idx.Frame, i
 	selfParentFrame := idx.Frame(0)
 
 	for _, parent := range e.Parents {
-		pFrame := p.GetEventHeader(p.EpochN, parent).Frame
+		pFrame := p.GetEvent(p.EpochN, parent).Frame
 		if maxParentsFrame == 0 || pFrame > maxParentsFrame {
 			maxParentsFrame = pFrame
 		}

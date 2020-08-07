@@ -1,14 +1,15 @@
-package inter
+package dag
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
 	"testing"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
 )
 
 func TestEventsByParents(t *testing.T) {
-	nodes := GenNodes(5)
-	events := GenRandEvents(nodes, 10, 3, nil)
+	nodes := tdag.GenNodes(5)
+	events := tdag.GenRandEvents(nodes, 10, 3, nil)
 	var unordered Events
 	for _, ee := range events {
 		unordered = append(unordered, ee...)
@@ -17,7 +18,7 @@ func TestEventsByParents(t *testing.T) {
 	ordered := unordered.ByParents()
 	position := make(map[hash.Event]int)
 	for i, e := range ordered {
-		position[e.Hash()] = i
+		position[e.ID()] = i
 	}
 
 	for i, e := range ordered {
@@ -27,7 +28,7 @@ func TestEventsByParents(t *testing.T) {
 				continue
 			}
 			if pos > i {
-				t.Fatalf("parent %s is not before %s", p.String(), e.Hash().String())
+				t.Fatalf("parent %s is not before %s", p.String(), e.ID().String())
 				return
 			}
 		}

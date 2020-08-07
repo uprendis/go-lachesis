@@ -16,7 +16,7 @@ import (
 // GenesisMismatchError is raised when trying to overwrite an existing
 // genesis block with an incompatible one.
 type GenesisMismatchError struct {
-	Stored, New common.Hash
+	Stored, New hash.Hash
 }
 
 // Error implements error interface.
@@ -29,10 +29,10 @@ type GenesisState struct {
 	Epoch       idx.Epoch
 	Time        inter.Timestamp // consensus time of the last Atropos
 	LastAtropos hash.Event
-	AppHash     common.Hash
+	AppHash     hash.Hash
 }
 
-func (g *GenesisState) Hash() common.Hash {
+func (g *GenesisState) Hash() hash.Hash {
 	hasher := sha3.NewLegacyKeccak256()
 	if err := rlp.Encode(hasher, g); err != nil {
 		panic(err)
@@ -45,17 +45,17 @@ func (g *GenesisState) EpochName() string {
 }
 
 // calcGenesisHash calcs hash of genesis state.
-func calcGenesisHash(g *genesis.Genesis, genesisAtropos hash.Event, appHash common.Hash) common.Hash {
+func calcGenesisHash(g *genesis.Genesis, genesisAtropos hash.Event, appHash hash.Hash) hash.Hash {
 	s := NewMemStore()
 	defer s.Close()
 
 	_ = s.ApplyGenesis(g, genesisAtropos, appHash)
 
-	return s.GetGenesis().PrevEpoch.Hash()
+	return s.GetGenesis().PrevEpoch.ID()
 }
 
 // ApplyGenesis writes initial state.
-func (s *Store) ApplyGenesis(g *genesis.Genesis, genesisAtropos hash.Event, appHash common.Hash) error {
+func (s *Store) ApplyGenesis(g *genesis.Genesis, genesisAtropos hash.Event, appHash hash.Hash) error {
 	if g == nil {
 		return fmt.Errorf("genesis config shouldn't be nil")
 	}
@@ -64,7 +64,7 @@ func (s *Store) ApplyGenesis(g *genesis.Genesis, genesisAtropos hash.Event, appH
 	}
 
 	if stored := s.GetGenesis(); stored != nil {
-		storedHash := stored.PrevEpoch.Hash()
+		storedHash := stored.PrevEpoch.ID()
 		newHash := calcGenesisHash(g, genesisAtropos, appHash)
 		if storedHash != newHash {
 			return &GenesisMismatchError{newHash, storedHash}

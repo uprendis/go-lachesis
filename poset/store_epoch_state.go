@@ -16,7 +16,7 @@ func (s *Store) GetGenesis() *EpochState {
 }
 
 // GetGenesisHash returns PrevEpochHash of first epoch.
-func (s *Store) GetGenesisHash() common.Hash {
+func (s *Store) GetGenesisHash() hash.Hash {
 	if s.cache.GenesisHash != nil {
 		return *s.cache.GenesisHash
 	}
@@ -25,7 +25,7 @@ func (s *Store) GetGenesisHash() common.Hash {
 	if epoch == nil {
 		s.Log.Crit("No genesis found")
 	}
-	h := epoch.PrevEpoch.Hash()
+	h := epoch.PrevEpoch.ID()
 
 	// update cache
 	s.cache.GenesisHash = &h

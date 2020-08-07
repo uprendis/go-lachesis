@@ -29,7 +29,7 @@ type Store struct {
 	}
 
 	cache struct {
-		GenesisHash *common.Hash
+		GenesisHash *hash.Hash
 		FrameRoots  *lru.Cache `cache:"-"` // store by pointer
 	}
 

@@ -1,6 +1,7 @@
 package vector
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"github.com/hashicorp/golang-lru"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
@@ -40,7 +41,7 @@ type Index struct {
 
 	bi *branchesInfo
 
-	getEvent func(hash.Event) *inter.EventHeaderData
+	getEvent func(hash.Event) *dag.Event
 
 	vecDb kvdb.FlushableKeyValueStore
 	table struct {
@@ -77,7 +78,7 @@ func DefaultIndexConfig() IndexConfig {
 }
 
 // NewIndex creates Index instance.
-func NewIndex(config IndexConfig, validators *pos.Validators, db kvdb.KeyValueStore, getEvent func(hash.Event) *inter.EventHeaderData) *Index {
+func NewIndex(config IndexConfig, validators *pos.Validators, db kvdb.KeyValueStore, getEvent func(hash.Event) *dag.Event) *Index {
 	vi := &Index{
 		Instance: logger.MakeInstance(),
 		cfg:      config,
@@ -92,7 +93,7 @@ func NewIndex(config IndexConfig, validators *pos.Validators, db kvdb.KeyValueSt
 }
 
 // Reset resets buffers.
-func (vi *Index) Reset(validators *pos.Validators, db kvdb.KeyValueStore, getEvent func(hash.Event) *inter.EventHeaderData) {
+func (vi *Index) Reset(validators *pos.Validators, db kvdb.KeyValueStore, getEvent func(hash.Event) *dag.Event) {
 	// we use wrapper to be able to drop failed events by dropping cache
 	vi.getEvent = getEvent
 	vi.vecDb = flushable.Wrap(db)
@@ -112,10 +113,10 @@ func (vi *Index) dropDependentCaches() {
 }
 
 // Add calculates vector clocks for the event and saves into DB.
-func (vi *Index) Add(e *inter.EventHeaderData) {
+func (vi *Index) Add(e *dag.Event) {
 	// sanity check
-	if vi.GetHighestBeforeSeq(e.Hash()) != nil {
-		vi.Log.Warn("Event already exists", "event", e.Hash().String())
+	if vi.GetHighestBeforeSeq(e.ID()) != nil {
+		vi.Log.Warn("Event already exists", "event", e.ID().String())
 		return
 	}
 	vi.initBranchesInfo()
@@ -141,7 +142,7 @@ func (vi *Index) DropNotFlushed() {
 	}
 }
 
-func (vi *Index) fillGlobalBranchID(e *inter.EventHeaderData, meIdx idx.Validator) idx.Validator {
+func (vi *Index) fillGlobalBranchID(e *dag.Event, meIdx idx.Validator) idx.Validator {
 	// sanity checks
 	if len(vi.bi.BranchIDCreatorIdxs) != len(vi.bi.BranchIDLastSeq) {
 		vi.Log.Crit("Inconsistent BranchIDCreators len (inconsistent DB)", "event", e.String())
@@ -191,7 +192,7 @@ func (vi *Index) setForkDetected(beforeSeq HighestBeforeSeq, branchID idx.Valida
 }
 
 // fillEventVectors calculates (and stores) event's vectors, and updates LowestAfter of newly-observed events.
-func (vi *Index) fillEventVectors(e *inter.EventHeaderData) allVecs {
+func (vi *Index) fillEventVectors(e *dag.Event) allVecs {
 	meIdx := vi.validatorIdxs[e.Creator]
 	myVecs := allVecs{
 		beforeSeq:  NewHighestBeforeSeq(len(vi.bi.BranchIDCreatorIdxs)),
@@ -301,9 +302,9 @@ func (vi *Index) fillEventVectors(e *inter.EventHeaderData) allVecs {
 	}
 
 	// store calculated vectors
-	vi.SetHighestBefore(e.Hash(), myVecs.beforeSeq, myVecs.beforeTime)
-	vi.SetLowestAfter(e.Hash(), myVecs.after)
-	vi.setEventBranchID(e.Hash(), meBranchID)
+	vi.SetHighestBefore(e.ID(), myVecs.beforeSeq, myVecs.beforeTime)
+	vi.SetLowestAfter(e.ID(), myVecs.after)
+	vi.setEventBranchID(e.ID(), meBranchID)
 
 	return myVecs
 }

@@ -1,6 +1,8 @@
 package ordering
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag/tdag"
 	"math/rand"
 	"testing"
 	"time"
@@ -8,30 +10,29 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/parentscheck"
 	"github.com/Fantom-foundation/go-lachesis/hash"
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
 )
 
 func TestEventBuffer(t *testing.T) {
-	nodes := inter.GenNodes(5)
+	nodes := tdag.GenNodes(5)
 
-	var ordered []*inter.Event
+	var ordered []*dag.Event
 	r := rand.New(rand.NewSource(time.Now().Unix()))
-	_ = inter.ForEachRandEvent(nodes, 10, 3, r, inter.ForEachEvent{
-		Process: func(e *inter.Event, name string) {
+	_ = tdag.ForEachRandEvent(nodes, 10, 3, r, tdag.ForEachEvent{
+		Process: func(e *dag.Event, name string) {
 			ordered = append(ordered, e)
 		},
-		Build: func(e *inter.Event, name string) *inter.Event {
+		Build: func(e *dag.Event, name string) *dag.Event {
 			e.Epoch = 1
 			e.ClaimedTime = inter.Timestamp(e.Seq)
 			return e
 		},
 	})
 
-	processed := make(map[hash.Event]*inter.EventHeaderData)
+	processed := make(map[hash.Event]*dag.Event)
 	buffer := New(len(nodes)*10, Callback{
 
-		Process: func(e *inter.Event) error {
-			if _, ok := processed[e.Hash()]; ok {
+		Process: func(e *dag.Event) error {
+			if _, ok := processed[e.ID()]; ok {
 				t.Fatalf("%s already processed", e.String())
 				return nil
 			}
@@ -41,11 +42,11 @@ func TestEventBuffer(t *testing.T) {
 					return nil
 				}
 			}
-			processed[e.Hash()] = &e.EventHeaderData
+			processed[e.ID()] = e
 			return nil
 		},
 
-		Drop: func(e *inter.Event, peer string, err error) {
+		Drop: func(e *dag.Event, peer string, err error) {
 			t.Fatalf("%s unexpectedly dropped with %s", e.String(), err)
 		},
 
@@ -53,7 +54,7 @@ func TestEventBuffer(t *testing.T) {
 			return processed[e] != nil
 		},
 
-		Get: func(e hash.Event) *inter.EventHeaderData {
+		Get: func(e hash.Event) *dag.Event {
 			return processed[e]
 		},
 
@@ -67,7 +68,7 @@ func TestEventBuffer(t *testing.T) {
 
 	// everything is processed
 	for _, e := range ordered {
-		if _, ok := processed[e.Hash()]; !ok {
+		if _, ok := processed[e.ID()]; !ok {
 			t.Fatal("event wasn't processed")
 		}
 	}

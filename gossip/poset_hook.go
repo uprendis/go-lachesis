@@ -1,26 +1,26 @@
 package gossip
 
 import (
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/Fantom-foundation/go-lachesis/hash"
 	"github.com/Fantom-foundation/go-lachesis/inter"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
+	"github.com/Fantom-foundation/go-lachesis/lachesis"
 	"github.com/Fantom-foundation/go-lachesis/vector"
 )
 
 // HookedEngine is a wrapper around any engine, which hooks ProcessEvent()
 type HookedEngine struct {
-	engine Consensus
+	engine lachesis.Consensus
 
-	processEvent func(realEngine Consensus, e *inter.Event) error
+	processEvent func(realEngine lachesis.Consensus, e *dag.Event) error
 }
 
 // ProcessEvent takes event into processing.
 // Event order matter: parents first.
 // ProcessEvent is not safe for concurrent use
-func (hook *HookedEngine) ProcessEvent(e *inter.Event) error {
+func (hook *HookedEngine) ProcessEvent(e *dag.Event) error {
 	return hook.processEvent(hook.engine, e)
 }
 
@@ -33,16 +33,16 @@ func (hook *HookedEngine) GetVectorIndex() *vector.Index {
 }
 
 // GetGenesisHash returns PrevEpochHash of first epoch.
-func (hook *HookedEngine) GetGenesisHash() common.Hash {
+func (hook *HookedEngine) GetGenesisHash() hash.Hash {
 	if hook.engine == nil {
-		return common.Hash{}
+		return hash.Hash{}
 	}
 	return hook.engine.GetGenesisHash()
 }
 
 // Prepare fills consensus-related fields: Frame, IsRoot, MedianTimestamp, PrevEpochHash, GasPowerLeft
 // returns nil if event should be dropped
-func (hook *HookedEngine) Prepare(e *inter.Event) *inter.Event {
+func (hook *HookedEngine) Prepare(e *dag.Event) *dag.Event {
 	if hook.engine == nil {
 		return e
 	}
@@ -90,7 +90,7 @@ func (hook *HookedEngine) GetConsensusTime(id hash.Event) (inter.Timestamp, erro
 }
 
 // Bootstrap restores poset's state from store.
-func (hook *HookedEngine) Bootstrap(callbacks inter.ConsensusCallbacks) {
+func (hook *HookedEngine) Bootstrap(callbacks lachesis.ConsensusCallbacks) {
 	if hook.engine == nil {
 		return
 	}

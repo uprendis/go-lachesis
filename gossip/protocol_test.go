@@ -53,7 +53,7 @@ func testStatusMsgErrors(t *testing.T, protocol int) {
 			wantError: errResp(ErrNetworkIDMismatch, "999 (!= %d)", networkID),
 		},
 		{
-			code: EthStatusMsg, data: ethStatusData{ProtocolVersion: uint32(protocol), NetworkID: networkID, Genesis: common.Hash{3}},
+			code: EthStatusMsg, data: ethStatusData{ProtocolVersion: uint32(protocol), NetworkID: networkID, Genesis: hash.Hash{3}},
 			wantError: errResp(ErrGenesisMismatch, "0300000000000000 (!= %x)", genesis.Bytes()[:8]),
 		},
 	}
@@ -100,8 +100,8 @@ func testRecvTransactions(t *testing.T, protocol int) {
 	case added := <-txAdded:
 		if len(added) != 1 {
 			t.Errorf("wrong number of added transactions: got %d, want 1", len(added))
-		} else if added[0].Hash() != tx.Hash() {
-			t.Errorf("added wrong tx hash: got %v, want %v", added[0].Hash(), tx.Hash())
+		} else if added[0].ID() != tx.ID() {
+			t.Errorf("added wrong tx hash: got %v, want %v", added[0].ID(), tx.ID())
 		}
 	case <-time.After(2 * time.Second):
 		t.Errorf("no NewTxsNotify received within 2 seconds")
@@ -131,9 +131,9 @@ func testSendTransactions(t *testing.T, protocol int) {
 	checktxs := func(p *testPeer) {
 		defer wg.Done()
 		defer p.close()
-		seen := make(map[common.Hash]bool)
+		seen := make(map[hash.Hash]bool)
 		for _, tx := range alltxs {
-			seen[tx.Hash()] = false
+			seen[tx.ID()] = false
 		}
 		for n := 0; n < len(alltxs) && !t.Failed(); {
 			var txs []*types.Transaction
@@ -147,7 +147,7 @@ func testSendTransactions(t *testing.T, protocol int) {
 				t.Errorf("%v: %v", p.Peer, err)
 			}
 			for _, tx := range txs {
-				hash := tx.Hash()
+				hash := tx.ID()
 				seentx, want := seen[hash]
 				if seentx {
 					t.Errorf("%v: got tx more than once: %x", p.Peer, hash)

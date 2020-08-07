@@ -2,12 +2,13 @@ package gossip
 
 import (
 	"fmt"
+	"github.com/Fantom-foundation/go-lachesis/inter/dag"
+	"github.com/Fantom-foundation/go-lachesis/lachesis"
 	"math"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	notify "github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -56,7 +57,7 @@ func checkLenLimits(size int, v interface{}) error {
 type dagNotifier interface {
 	SubscribeNewEpoch(ch chan<- idx.Epoch) notify.Subscription
 	SubscribeNewPack(ch chan<- idx.Pack) notify.Subscription
-	SubscribeNewEmitted(ch chan<- *inter.Event) notify.Subscription
+	SubscribeNewEmitted(ch chan<- *dag.Event) notify.Subscription
 }
 
 type ProtocolManager struct {
@@ -79,11 +80,11 @@ type ProtocolManager struct {
 	buffer     *ordering.EventBuffer
 
 	store    *Store
-	engine   Consensus
+	engine   lachesis.Consensus
 	engineMu *sync.RWMutex
 
 	notifier         dagNotifier
-	emittedEventsCh  chan *inter.Event
+	emittedEventsCh  chan *dag.Event
 	emittedEventsSub notify.Subscription
 	newPacksCh       chan idx.Pack
 	newPacksSub      notify.Subscription
@@ -113,7 +114,7 @@ func NewProtocolManager(
 	engineMu *sync.RWMutex,
 	checkers *eventcheck.Checkers,
 	s *Store,
-	engine Consensus,
+	engine lachesis.Consensus,
 	serverPool *serverPool,
 ) (
 	*ProtocolManager,
@@ -147,7 +148,7 @@ func NewProtocolManager(
 
 func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.Fetcher, *ordering.EventBuffer) {
 	// checkers
-	firstCheck := func(e *inter.Event) error {
+	firstCheck := func(e *dag.Event) error {
 		if err := checkers.Basiccheck.Validate(e); err != nil {
 			return err
 		}
@@ -156,8 +157,8 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 		}
 		return nil
 	}
-	bufferedCheck := func(e *inter.Event, parents []*inter.EventHeaderData) error {
-		var selfParent *inter.EventHeaderData
+	bufferedCheck := func(e *dag.Event, parents []*dag.Event) error {
+		var selfParent *dag.Event
 		if e.SelfParent() != nil {
 			selfParent = parents[0]
 		}
@@ -173,7 +174,7 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 	// DAG callbacks
 	buffer := ordering.New(eventsBuffSize, ordering.Callback{
 
-		Process: func(e *inter.Event) error {
+		Process: func(e *dag.Event) error {
 			now := time.Now()
 			pm.engineMu.Lock()
 			defer pm.engineMu.Unlock()
@@ -183,7 +184,7 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 			if err != nil {
 				return err
 			}
-			log.Info("New event", "id", e.Hash(), "parents", len(e.Parents), "by", e.Creator, "frame", inter.FmtFrame(e.Frame, e.IsRoot), "txs", e.Transactions.Len(), "t", time.Since(start))
+			log.Info("New event", "id", e.ID(), "parents", len(e.Parents), "by", e.Creator, "frame", inter.FmtFrame(e.Frame, e.IsRoot), "txs", e.Transactions.Len(), "t", time.Since(start))
 
 			// If the event is indeed in our own graph, announce it
 			if atomic.LoadUint32(&pm.synced) != 0 { // announce only if synced up
@@ -194,19 +195,19 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 			return nil
 		},
 
-		Drop: func(e *inter.Event, peer string, err error) {
+		Drop: func(e *dag.Event, peer string, err error) {
 			if eventcheck.IsBan(err) {
-				log.Warn("Incoming event rejected", "event", e.Hash().String(), "creator", e.Creator, "err", err)
+				log.Warn("Incoming event rejected", "event", e.ID().String(), "creator", e.Creator, "err", err)
 				pm.removePeer(peer)
 			}
 		},
 
 		Exists: func(id hash.Event) bool {
-			return pm.store.HasEventHeader(id)
+			return pm.store.HasEvent(id)
 		},
 
-		Get: func(id hash.Event) *inter.EventHeaderData {
-			return pm.store.GetEventHeader(id.Epoch(), id)
+		Get: func(id hash.Event) *dag.Event {
+			return pm.store.GetEvent(id.Epoch(), id)
 		},
 
 		Check: bufferedCheck,
@@ -229,7 +230,7 @@ func (pm *ProtocolManager) onlyNotConnectedEvents(ids hash.Events) hash.Events {
 
 	notConnected := make(hash.Events, 0, len(ids))
 	for _, id := range ids {
-		if pm.store.HasEventHeader(id) {
+		if pm.store.HasEvent(id) {
 			continue
 		}
 		notConnected.Add(id)
@@ -248,7 +249,7 @@ func (pm *ProtocolManager) onlyInterestedEvents(ids hash.Events) hash.Events {
 		if id.Epoch() != epoch {
 			continue
 		}
-		if pm.buffer.IsBuffered(id) || pm.store.HasEventHeader(id) {
+		if pm.buffer.IsBuffered(id) || pm.store.HasEvent(id) {
 			continue
 		}
 		interested.Add(id)
@@ -330,7 +331,7 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 
 	if pm.notifier != nil {
 		// broadcast mined events
-		pm.emittedEventsCh = make(chan *inter.Event, 4)
+		pm.emittedEventsCh = make(chan *dag.Event, 4)
 		pm.emittedEventsSub = pm.notifier.SubscribeNewEmitted(pm.emittedEventsCh)
 		// broadcast packs
 		pm.newPacksCh = make(chan idx.Pack, 4)
@@ -521,7 +522,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if pm.fetcher.Overloaded() {
 			break
 		}
-		var events []*inter.Event
+		var events []*dag.Event
 		if err := msg.Decode(&events); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
@@ -530,7 +531,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 		// Mark the hashes as present at the remote node
 		for _, e := range events {
-			p.MarkEvent(e.Hash())
+			p.MarkEvent(e.ID())
 		}
 		_ = pm.fetcher.Enqueue(p.id, events, time.Now(), p.RequestEvents)
 
@@ -549,7 +550,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			if tx == nil {
 				return errResp(ErrDecode, "transaction %d is nil", i)
 			}
-			p.MarkTransaction(tx.Hash())
+			p.MarkTransaction(tx.ID())
 		}
 		pm.txpool.AddRemotes(txs)
 
@@ -741,11 +742,11 @@ func (pm *ProtocolManager) decideBroadcastAggressiveness(size int, passed time.D
 
 // BroadcastEvent will either propagate a event to a subset of it's peers, or
 // will only announce it's availability (depending what's requested).
-func (pm *ProtocolManager) BroadcastEvent(event *inter.Event, passed time.Duration) int {
+func (pm *ProtocolManager) BroadcastEvent(event *dag.Event, passed time.Duration) int {
 	if passed < 0 {
 		passed = 0
 	}
-	id := event.Hash()
+	id := event.ID()
 	peers := pm.peers.PeersWithoutEvent(id)
 	if len(peers) == 0 {
 		log.Trace("Event is already known to all peers", "hash", id)
@@ -757,12 +758,12 @@ func (pm *ProtocolManager) BroadcastEvent(event *inter.Event, passed time.Durati
 	// Broadcast of full event to a subset of peers
 	fullBroadcast := peers[:fullRecipients]
 	for _, peer := range fullBroadcast {
-		peer.AsyncSendEvents(inter.Events{event})
+		peer.AsyncSendEvents(dag.Events{event})
 	}
 	// Broadcast of event hash to the rest peers
 	hashBroadcast := peers[fullRecipients:]
 	for _, peer := range hashBroadcast {
-		peer.AsyncSendNewEventHashes(hash.Events{event.Hash()})
+		peer.AsyncSendNewEventHashes(hash.Events{event.ID()})
 	}
 	log.Trace("Broadcast event", "hash", id, "fullRecipients", len(fullBroadcast), "hashRecipients", len(hashBroadcast))
 	return len(peers)
@@ -779,11 +780,11 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 
 	// Broadcast transactions to a batch of peers not knowing about it
 	for _, tx := range txs {
-		peers := pm.peers.PeersWithoutTx(tx.Hash())
+		peers := pm.peers.PeersWithoutTx(tx.ID())
 		for _, peer := range peers {
 			txset[peer] = append(txset[peer], tx)
 		}
-		log.Trace("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
+		log.Trace("Broadcast transaction", "hash", tx.ID(), "recipients", len(peers))
 	}
 	// FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
 	for peer, txs := range txset {
@@ -879,7 +880,7 @@ func (pm *ProtocolManager) txBroadcastLoop() {
 // known about the host peer.
 type NodeInfo struct {
 	Network     uint64      `json:"network"` // network ID
-	Genesis     common.Hash `json:"genesis"` // SHA3 hash of the host's genesis object
+	Genesis     hash.Hash `json:"genesis"` // SHA3 hash of the host's genesis object
 	Epoch       idx.Epoch   `json:"epoch"`
 	NumOfBlocks idx.Block   `json:"blocks"`
 	//Config  *params.ChainConfig `json:"config"`  // Chain configuration for the fork rules
