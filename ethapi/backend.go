@@ -163,7 +163,7 @@ func GetAPIs(apiBackend Backend) []rpc.API {
 			Service:   NewPrivateAccountAPI(apiBackend, nonceLock),
 			Public:    false,
 		}, {
-			Namespace: "sfc",
+			Namespace: "staking",
 			Version:   "1.0",
 			Service:   NewPublicSfcAPI(apiBackend),
 			Public:    false,

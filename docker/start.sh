@@ -24,8 +24,8 @@ do
 	lachesis:${TAG} \
 	--fakenet=${ACC}/$N,/tmp/test_accs.json \
 	--port=5050 \
-	--rpc --rpcaddr="0.0.0.0" --rpcport=18545 --rpcvhosts="*" --rpccorsdomain="*" --rpcapi="eth,debug,admin,web3,personal,net,txpool,ftm,sfc" \
-	--ws --wsaddr="0.0.0.0" --wsport=18546 --wsorigins="*" --wsapi="eth,debug,admin,web3,personal,net,txpool,ftm,sfc" \
+	--rpc --rpcaddr="0.0.0.0" --rpcport=18545 --rpcvhosts="*" --rpccorsdomain="*" --rpcapi="eth,debug,admin,web3,personal,net,txpool,ftm,staking" \
+	--ws --wsaddr="0.0.0.0" --wsport=18546 --wsorigins="*" --wsapi="eth,debug,admin,web3,personal,net,txpool,ftm,staking" \
 	--nousb --verbosity=3 --metrics \
 	${SENTRY_DSN}
 done

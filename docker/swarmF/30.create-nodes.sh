@@ -35,8 +35,8 @@ do
    ${REGISTRY_HOST}/lachesis:${TAG} --nousb \
     --verbosity=3 \
     --fakenet=$ACC/$N \
-    --rpc --rpcaddr="0.0.0.0" --rpcport=${RPCP} --rpccorsdomain="*" --rpcapi="eth,debug,admin,web3,personal,net,txpool,ftm,sfc" \
-    --ws --wsaddr="0.0.0.0" --wsport=${WSP} --wsorigins="*" --wsapi="eth,debug,admin,web3,personal,net,txpool,ftm,sfc" \
+    --rpc --rpcaddr="0.0.0.0" --rpcport=${RPCP} --rpccorsdomain="*" --rpcapi="eth,debug,admin,web3,personal,net,txpool,ftm,staking" \
+    --ws --wsaddr="0.0.0.0" --wsport=${WSP} --wsorigins="*" --wsapi="eth,debug,admin,web3,personal,net,txpool,ftm,staking" \
     --port=${PORT} --nat="extip:${SWARM_HOST}" \
     --datadir=/var/lachesis \
     ${bootnode}
