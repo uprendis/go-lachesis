@@ -71,9 +71,9 @@ func ForEachRandFork(
 		}
 		parents = parents[:parentCount-1]
 		// make
-		te := TestEvent{}
-		te.SetCreator(creator)
-		te.SetParents(hash.Events{})
+		e := &TestEvent{}
+		e.SetCreator(creator)
+		e.SetParents(hash.Events{})
 		// first parent is a last creator's event or empty hash
 		var parent dag.Event
 		if ee := events[creator]; len(ee) > 0 {
@@ -93,35 +93,35 @@ func ForEachRandFork(
 			}
 		}
 		if parent == nil {
-			te.SetSeq(1)
-			te.SetLamport(1)
+			e.SetSeq(1)
+			e.SetLamport(1)
 		} else {
-			te.SetSeq(parent.Seq() + 1)
-			te.AddParent(parent.ID())
-			te.SetLamport(parent.Lamport() + 1)
+			e.SetSeq(parent.Seq() + 1)
+			e.AddParent(parent.ID())
+			e.SetLamport(parent.Lamport() + 1)
 		}
+		e.SetRawTime(dag.RawTimestamp(e.Seq()))
 		// other parents are the lasts other's events
 		for _, other := range parents {
 			if ee := events[nodes[other]]; len(ee) > 0 {
 				parent := ee[len(ee)-1]
-				te.AddParent(parent.ID())
-				if te.Lamport() <= parent.Lamport() {
-					te.SetLamport(parent.Lamport() + 1)
+				e.AddParent(parent.ID())
+				if e.Lamport() <= parent.Lamport() {
+					e.SetLamport(parent.Lamport() + 1)
 				}
 			}
 		}
-		name := fmt.Sprintf("%s%03d", string('a'+self), len(events[creator]))
+		e.Name = fmt.Sprintf("%s%03d", string('a'+self), len(events[creator]))
 		// buildEvent callback
-		var e dag.Event
 		if callback.Build != nil {
-			e = callback.Build(&te, name)
-		}
-		if e == nil {
-			continue
+			err := callback.Build(e, e.Name)
+			if err != nil {
+				continue
+			}
 		}
 		// save and name event
 		hasher := sha3.NewLegacyKeccak256()
-		hasher.Write(EventToBytes(e))
+		hasher.Write(e.Bytes())
 		id := [24]byte{}
 		copy(id[:], hasher.Sum(nil)[:24])
 		e.SetID(id)
@@ -129,7 +129,7 @@ func ForEachRandFork(
 		events[creator] = append(events[creator], e)
 		// callback
 		if callback.Process != nil {
-			callback.Process(e, name)
+			callback.Process(e, e.Name)
 		}
 	}
 
@@ -147,7 +147,7 @@ func ForEachRandEvent(
 	r *rand.Rand,
 	callback ForEachEvent,
 ) (
-	events map[idx.StakerID][]*dag.BaseEvent,
+	events map[idx.StakerID][]dag.Event,
 ) {
 	return ForEachRandFork(nodes, []idx.StakerID{}, eventCount, parentCount, 0, r, callback)
 }
@@ -161,12 +161,12 @@ func GenRandEvents(
 	parentCount int,
 	r *rand.Rand,
 ) (
-	events map[idx.StakerID][]*dag.BaseEvent,
+	events map[idx.StakerID][]dag.Event,
 ) {
 	return ForEachRandEvent(nodes, eventCount, parentCount, r, ForEachEvent{})
 }
 
-func delPeerIndex(events map[idx.StakerID][]*dag.Event) (res dag.Events) {
+func delPeerIndex(events map[idx.StakerID][]dag.Event) (res dag.Events) {
 	for _, ee := range events {
 		res = append(res, ee...)
 	}

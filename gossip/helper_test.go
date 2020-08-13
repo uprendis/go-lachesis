@@ -18,18 +18,18 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/lachesis"
 	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
-	"github.com/Fantom-foundation/go-lachesis/poset"
+	"github.com/Fantom-foundation/go-lachesis/abft"
 )
 
 // newTestProtocolManager creates a new protocol manager for testing purposes,
 // with the given number of events already known from each node
-func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.Transaction, onNewEvent func(e *dag.Event)) (*ProtocolManager, *Store, error) {
+func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.Transaction, onNewEvent func(e dag.Event)) (*ProtocolManager, *Store, error) {
 	net := lachesis.FakeNetConfig(genesis.FakeValidators(nodesNum, big.NewInt(0), pos.StakeToBalance(1)))
 
 	config := DefaultConfig(net)
 	config.TxPool.Journal = ""
 
-	engineStore := poset.NewMemStore()
+	engineStore := abft.NewMemStore()
 	err := engineStore.ApplyGenesis(&net.Genesis, hash.Event{}, hash.Hash{})
 	if err != nil {
 		return nil, nil, err
@@ -41,7 +41,7 @@ func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.T
 		return nil, nil, err
 	}
 
-	engine := poset.New(net.Dag, engineStore, store)
+	engine := abft.New(net.Dag, engineStore, store)
 	engine.Bootstrap(lachesis.ConsensusCallbacks{})
 
 	pm, err := NewProtocolManager(
@@ -59,7 +59,7 @@ func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.T
 	}
 
 	tdag.ForEachRandEvent(net.Genesis.Alloc.Validators.Validators().IDs(), eventsNum, 3, nil, tdag.ForEachEvent{
-		Process: func(e *dag.Event, name string) {
+		Process: func(e dag.Event, name string) {
 			store.SetEvent(e)
 			err = engine.ProcessEvent(e)
 			if err != nil {
@@ -69,7 +69,7 @@ func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.T
 				onNewEvent(e)
 			}
 		},
-		Build: func(e *dag.Event, name string) *dag.Event {
+		Build: func(e dag.Event, name string) dag.Event {
 			e.Epoch = 1
 			return engine.Prepare(e)
 		},
@@ -82,7 +82,7 @@ func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.T
 // newTestProtocolManagerMust creates a new protocol manager for testing purposes,
 // with the given number of events already known from each peer. In case of an error, the constructor force-
 // fails the test.
-func newTestProtocolManagerMust(t *testing.T, nodes int, events int, newtx chan<- []*types.Transaction, onNewEvent func(e *dag.Event)) (*ProtocolManager, *Store) {
+func newTestProtocolManagerMust(t *testing.T, nodes int, events int, newtx chan<- []*types.Transaction, onNewEvent func(e dag.Event)) (*ProtocolManager, *Store) {
 	pm, db, err := newTestProtocolManager(nodes, events, newtx, onNewEvent)
 	if err != nil {
 		t.Fatalf("Failed to create protocol manager: %v", err)

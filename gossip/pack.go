@@ -18,7 +18,7 @@ const (
 	maxPackEventsNum = softLimitItems
 )
 
-func (s *Service) packsOnNewEvent(e *dag.Event, epoch idx.Epoch) {
+func (s *Service) packsOnNewEvent(e dag.Event, epoch idx.Epoch) {
 	// due to default values, we don't need to explicitly set values at a start of an epoch
 	packIdx := s.store.GetPacksNumOrDefault(epoch)
 	packInfo := s.store.GetPackInfoOrDefault(s.engine.GetEpoch(), packIdx)

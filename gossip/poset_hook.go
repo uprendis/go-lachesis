@@ -14,13 +14,13 @@ import (
 type HookedEngine struct {
 	engine lachesis.Consensus
 
-	processEvent func(realEngine lachesis.Consensus, e *dag.Event) error
+	processEvent func(realEngine lachesis.Consensus, e dag.Event) error
 }
 
 // ProcessEvent takes event into processing.
 // Event order matter: parents first.
 // ProcessEvent is not safe for concurrent use
-func (hook *HookedEngine) ProcessEvent(e *dag.Event) error {
+func (hook *HookedEngine) ProcessEvent(e dag.Event) error {
 	return hook.processEvent(hook.engine, e)
 }
 
@@ -42,14 +42,14 @@ func (hook *HookedEngine) GetGenesisHash() hash.Hash {
 
 // Prepare fills consensus-related fields: Frame, IsRoot, MedianTimestamp, PrevEpochHash, GasPowerLeft
 // returns nil if event should be dropped
-func (hook *HookedEngine) Prepare(e *dag.Event) *dag.Event {
+func (hook *HookedEngine) Prepare(e dag.Event) dag.Event {
 	if hook.engine == nil {
 		return e
 	}
 	return hook.engine.Prepare(e)
 }
 
-// GetEpoch returns current epoch num to 3rd party.
+// GetEpochState returns current epoch num to 3rd party.
 func (hook *HookedEngine) GetEpoch() idx.Epoch {
 	if hook.engine == nil {
 		return 1
@@ -82,14 +82,14 @@ func (hook *HookedEngine) GetValidators() *pos.Validators {
 }
 
 // GetConsensusTime calc consensus timestamp for given event, if event is confirmed.
-func (hook *HookedEngine) GetConsensusTime(id hash.Event) (inter.Timestamp, error) {
+func (hook *HookedEngine) GetConsensusTime(id hash.Event) (dag.RawTimestamp, error) {
 	if hook.engine == nil {
 		return 0, nil
 	}
 	return hook.engine.GetConsensusTime(id)
 }
 
-// Bootstrap restores poset's state from store.
+// Bootstrap restores abft's state from store.
 func (hook *HookedEngine) Bootstrap(callbacks lachesis.ConsensusCallbacks) {
 	if hook.engine == nil {
 		return

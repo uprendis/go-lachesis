@@ -20,7 +20,7 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/lachesis"
 	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
 	"github.com/Fantom-foundation/go-lachesis/logger"
-	"github.com/Fantom-foundation/go-lachesis/poset"
+	"github.com/Fantom-foundation/go-lachesis/abft"
 )
 
 // Tests that events can be retrieved from a remote graph based on user queries.
@@ -32,11 +32,11 @@ func TestGetEvents62(t *testing.T) {
 func testGetEvents(t *testing.T, protocol int) {
 	assertar := assert.New(t)
 
-	var firstEvent *dag.Event
-	var someEvent *dag.Event
-	var lastEvent *dag.Event
+	var firstEvent dag.Event
+	var someEvent dag.Event
+	var lastEvent dag.Event
 	notExistingEvent := hash.HexToEventHash("0x6099dac580ff18a7055f5c92c2e0717dd4bf9907565df7a8502d0c3dd513b30c")
-	pm, _ := newTestProtocolManagerMust(t, 5, 5, nil, func(e *dag.Event) {
+	pm, _ := newTestProtocolManagerMust(t, 5, 5, nil, func(e dag.Event) {
 		if firstEvent == nil {
 			firstEvent = e
 		}
@@ -57,30 +57,30 @@ func testGetEvents(t *testing.T, protocol int) {
 	// Create a batch of tests for various scenarios
 	tests := []struct {
 		query  []hash.Event // The query to execute for events retrieval
-		expect []*dag.Event // The expected events
+		expect []dag.Event // The expected events
 	}{
 		// A single random event should be retrievable by hash and number too
 		{
 			[]hash.Event{someEvent.ID()},
-			[]*dag.Event{someEvent},
+			[]dag.Event{someEvent},
 		},
 		// Multiple events should be retrievable in both directions
 		{
 			[]hash.Event{firstEvent.ID(), someEvent.ID(), lastEvent.ID()},
-			[]*dag.Event{firstEvent, someEvent, lastEvent},
+			[]dag.Event{firstEvent, someEvent, lastEvent},
 		}, {
 			[]hash.Event{lastEvent.ID(), someEvent.ID(), firstEvent.ID()},
-			[]*dag.Event{lastEvent, someEvent, firstEvent},
+			[]dag.Event{lastEvent, someEvent, firstEvent},
 		},
 		// Check repeated requests
 		{
 			[]hash.Event{someEvent.ID(), someEvent.ID()},
-			[]*dag.Event{someEvent, someEvent},
+			[]dag.Event{someEvent, someEvent},
 		},
 		// Check that non existing events aren't returned
 		{
 			[]hash.Event{notExistingEvent, someEvent.ID(), notExistingEvent},
-			[]*dag.Event{someEvent},
+			[]dag.Event{someEvent},
 		},
 	}
 	// Run each of the tests and verify the results against the chain
@@ -145,14 +145,14 @@ func testBroadcastEvent(t *testing.T, totalPeers int, forcedAggressiveBroadcast 
 	if !assertar.NoError(err) {
 		return
 	}
-	engineStore := poset.NewMemStore()
+	engineStore := abft.NewMemStore()
 	err = engineStore.ApplyGenesis(&net.Genesis, genesisAtropos, genesisEvmState)
 	if !assertar.NoError(err) {
 		return
 	}
 
 	// create consensus engine
-	engine := poset.New(net.Dag, engineStore, store)
+	engine := abft.New(net.Dag, engineStore, store)
 	engine.Bootstrap(lachesis.ConsensusCallbacks{})
 
 	// create service
@@ -185,7 +185,7 @@ func testBroadcastEvent(t *testing.T, totalPeers int, forcedAggressiveBroadcast 
 	svc.emitter = svc.makeEmitter()
 	svc.emitter.SetValidator(creator)
 
-	emittedEvents := make([]*dag.Event, 0)
+	emittedEvents := make([]dag.Event, 0)
 	for i := 0; i < totalPeers; i++ {
 		emitted := svc.emitter.EmitEvent()
 		assertar.NotNil(emitted)
@@ -194,7 +194,7 @@ func testBroadcastEvent(t *testing.T, totalPeers int, forcedAggressiveBroadcast 
 		for _, peer := range peers {
 			if forcedAggressiveBroadcast {
 				// aggressive
-				assertar.NoError(p2p.ExpectMsg(peer.app, EventsMsg, []*dag.Event{emitted}))
+				assertar.NoError(p2p.ExpectMsg(peer.app, EventsMsg, []dag.Event{emitted}))
 			} else {
 				// announce
 				assertar.NoError(p2p.ExpectMsg(peer.app, NewEventHashesMsg, []hash.Event{emitted.ID()}))
@@ -225,12 +225,12 @@ func testBroadcastEvent(t *testing.T, totalPeers int, forcedAggressiveBroadcast 
 			return
 		}
 		// send it to PM
-		assertar.NoError(p2p.Send(newPeer.app, EventsMsg, []*dag.Event{emitted}))
+		assertar.NoError(p2p.Send(newPeer.app, EventsMsg, []dag.Event{emitted}))
 		// PM should broadcast it to all other peer except newPeer
 		for _, peer := range peers {
 			if forcedAggressiveBroadcast {
 				// aggressive
-				assertar.NoError(p2p.ExpectMsg(peer.app, EventsMsg, []*dag.Event{emitted}))
+				assertar.NoError(p2p.ExpectMsg(peer.app, EventsMsg, []dag.Event{emitted}))
 			} else {
 				// announce
 				assertar.NoError(p2p.ExpectMsg(peer.app, NewEventHashesMsg, []hash.Event{emitted.ID()}))
@@ -247,7 +247,7 @@ func testBroadcastEvent(t *testing.T, totalPeers int, forcedAggressiveBroadcast 
 	for _, emitted := range emittedEvents {
 		for _, peer := range append(peers, newPeer) {
 			assertar.NoError(p2p.Send(peer.app, GetEventsMsg, []hash.Event{emitted.ID()})) // request
-			assertar.NoError(p2p.ExpectMsg(peer.app, EventsMsg, []*dag.Event{emitted}))    // response
+			assertar.NoError(p2p.ExpectMsg(peer.app, EventsMsg, []dag.Event{emitted}))    // response
 			if t.Failed() {
 				return
 			}

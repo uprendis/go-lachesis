@@ -23,7 +23,7 @@ type ValidationContext struct {
 	Configs              [2]Config
 	Validators           *pos.Validators
 	PrevEpochLastHeaders inter.HeadersByCreator
-	PrevEpochEndTime     inter.Timestamp
+	PrevEpochEndTime     dag.RawTimestamp
 	PrevEpochRefunds     map[idx.StakerID]uint64
 }
 
@@ -36,8 +36,8 @@ type DagReader interface {
 type Config struct {
 	Idx                int
 	AllocPerSec        uint64
-	MaxAllocPeriod     inter.Timestamp
-	StartupAllocPeriod inter.Timestamp
+	MaxAllocPeriod     dag.RawTimestamp
+	StartupAllocPeriod dag.RawTimestamp
 	MinStartupGas      uint64
 }
 
@@ -93,7 +93,7 @@ func calcValidatorGasPowerPerSec(
 }
 
 // CalcGasPower calculates available gas power for the event, i.e. how many gas its content may consume
-func (v *Checker) CalcGasPower(e *dag.Event, selfParent *dag.Event) (inter.GasPowerLeft, error) {
+func (v *Checker) CalcGasPower(e dag.Event, selfParent dag.Event) (inter.GasPowerLeft, error) {
 	ctx := v.reader.GetValidationContext()
 	// check that all the data is for the same epoch
 	if ctx.Epoch != e.Epoch {
@@ -108,11 +108,11 @@ func (v *Checker) CalcGasPower(e *dag.Event, selfParent *dag.Event) (inter.GasPo
 	return res, nil
 }
 
-func calcGasPower(e *dag.Event, selfParent *dag.Event, ctx *ValidationContext, config *Config) uint64 {
+func calcGasPower(e dag.Event, selfParent dag.Event, ctx *ValidationContext, config *Config) uint64 {
 	gasPowerPerSec, maxGasPower, startup := calcValidatorGasPowerPerSec(e.Creator, ctx.Validators, config)
 
 	var prevGasPowerLeft uint64
-	var prevMedianTime inter.Timestamp
+	var prevMedianTime dag.RawTimestamp
 
 	if e.SelfParent() != nil {
 		prevGasPowerLeft = selfParent.GasPowerLeft.Gas[config.Idx]
@@ -145,7 +145,7 @@ func calcGasPower(e *dag.Event, selfParent *dag.Event, ctx *ValidationContext, c
 }
 
 // Validate event
-func (v *Checker) Validate(e *dag.Event, selfParent *dag.Event) error {
+func (v *Checker) Validate(e dag.Event, selfParent dag.Event) error {
 	gasPowers, err := v.CalcGasPower(&e.Event, selfParent)
 	if err != nil {
 		return err

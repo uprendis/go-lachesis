@@ -20,8 +20,8 @@ import (
  */
 
 const (
-	forgetTimeout = 1 * time.Minute         // Time before an announced event is forgotten
-	arriveTimeout = 1000 * time.Millisecond // Time allowance before an announced event is explicitly requested
+	forgetTimeout = 1 * time.Minute         // RawTime before an announced event is forgotten
+	arriveTimeout = 1000 * time.Millisecond // RawTime allowance before an announced event is explicitly requested
 	gatherSlack   = 100 * time.Millisecond  // Interval used to collate almost-expired announces with fetches
 	fetchTimeout  = 10 * time.Second        // Maximum allowed time to return an explicitly requested event
 	hashLimit     = 3000                    // Maximum number of unique events a peer may have announced
@@ -52,11 +52,11 @@ type FilterInterestedFn func(ids hash.Events) hash.Events
 type EventsRequesterFn func(hash.Events) error
 
 // PushEventFn is a callback type to connect a received event
-type PushEventFn func(e *dag.Event, peer string)
+type PushEventFn func(e dag.Event, peer string)
 
 // inject represents a schedules import operation.
 type inject struct {
-	events []*dag.Event // Incoming events
+	events []dag.Event // Incoming events
 	time   time.Time    // Timestamp when received
 
 	peer string // Identifier of the peer which sent events
@@ -106,7 +106,7 @@ type Callback struct {
 	PeerMisbehaviour PeerMisbehaviourFn
 
 	HeavyCheck *heavycheck.Checker
-	FirstCheck func(*dag.Event) error
+	FirstCheck func(dag.Event) error
 }
 
 // New creates a event fetcher to retrieve events based on hash announcements.

@@ -88,8 +88,8 @@ func (st *CasualityStrategy) Find(options hash.Events) hash.Event {
 			st.template = vector.NewHighestBeforeSeq(st.validators.Len()) // nothing observes
 		}
 		for creatorIdx := idx.Validator(0); creatorIdx < idx.Validator(st.validators.Len()); creatorIdx++ {
-			my := st.template.Get(creatorIdx)
-			his := score.vec.Get(creatorIdx)
+			my := st.template.get(creatorIdx)
+			his := score.vec.get(creatorIdx)
 
 			// observes higher
 			if his.Seq > my.Seq && !my.IsForkDetected() {

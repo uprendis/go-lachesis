@@ -13,7 +13,7 @@ import (
 
 type ForEachEvent struct {
 	Process func(e dag.Event, name string)
-	Build   func(e dag.MutableEvent, name string) dag.Event
+	Build   func(e dag.MutableEvent, name string) error
 }
 
 // ASCIIschemeToDAG parses events from ASCII-scheme for test purpose.
@@ -163,26 +163,27 @@ func ASCIIschemeForEach(
 				}
 			}
 			// new event
-			te := &TestEvent{}
-			te.SetSeq(index)
-			te.SetCreator(creator)
-			te.SetParents(parents)
-			te.SetLamport(maxLamport + 1)
-			te.SetLamport(maxLamport + 1)
-			te.Name = name
+			e := &TestEvent{}
+			e.SetSeq(index)
+			e.SetCreator(creator)
+			e.SetParents(parents)
+			e.SetLamport(maxLamport + 1)
+			e.SetLamport(maxLamport + 1)
+			e.SetRawTime(dag.RawTimestamp((maxLamport)))
+			e.Name = name
 			// buildEvent callback
-			var e dag.Event
 			if callback.Build != nil {
-				e = callback.Build(te, name)
-			}
-			if e == nil {
-				continue
+				err := callback.Build(e, name)
+				if err != nil {
+					continue
+				}
 			}
 			// calc hash of the event, after it's fully built
 			hasher := sha3.NewLegacyKeccak256()
-			hasher.Write([]byte(name))
+			hasher.Write(e.Bytes())
 			id := [24]byte{}
 			copy(id[:], hasher.Sum(nil)[:24])
+			e.SetID(id)
 			// save event
 			events[creator] = append(events[creator], e)
 			names[name] = e
@@ -222,7 +223,7 @@ func ASCIIschemeToDAG(
 
 // DAGtoASCIIscheme builds ASCII-scheme of events for debug purpose.
 func DAGtoASCIIscheme(events dag.Events) (string, error) {
-	events = events.ByParents()
+	events = ByParents(events)
 
 	var (
 		scheme rows
@@ -268,7 +269,7 @@ func DAGtoASCIIscheme(events dag.Events) (string, error) {
 			if len(r.Name) < 1 {
 				r.Name = string('a' + r.Self)
 			}
-			r.Name = fmt.Sprintf("%s%03d", r.Name, e.Seq)
+			r.Name = fmt.Sprintf("%s%03d", r.Name, e.Seq())
 		}
 		if w := len([]rune(r.Name)); scheme.ColWidth < w {
 			scheme.ColWidth = w

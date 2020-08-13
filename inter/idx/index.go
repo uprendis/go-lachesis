@@ -38,11 +38,6 @@ func (e Event) Bytes() []byte {
 }
 
 // Bytes gets the byte representation of the index.
-func (t Txn) Bytes() []byte {
-	return bigendian.Uint32ToBytes(uint32(t))
-}
-
-// Bytes gets the byte representation of the index.
 func (b Block) Bytes() []byte {
 	return bigendian.Uint64ToBytes(uint64(b))
 }

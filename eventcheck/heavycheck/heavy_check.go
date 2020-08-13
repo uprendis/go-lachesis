@@ -37,7 +37,7 @@ type DagReader interface {
 
 // Check which require only parents list + current epoch info
 type Checker struct {
-	config   *lachesis.DagConfig
+	config   *lachesis.Config
 	txSigner types.Signer
 	reader   DagReader
 
@@ -56,7 +56,7 @@ type TaskData struct {
 }
 
 // NewDefault uses N-1 threads
-func NewDefault(config *lachesis.DagConfig, reader DagReader, txSigner types.Signer) *Checker {
+func NewDefault(config *lachesis.Config, reader DagReader, txSigner types.Signer) *Checker {
 	threads := runtime.NumCPU()
 	if threads > 1 {
 		threads--
@@ -68,7 +68,7 @@ func NewDefault(config *lachesis.DagConfig, reader DagReader, txSigner types.Sig
 }
 
 // New validator which performs heavy checks, related to signatures validation and Merkle tree validation
-func New(config *lachesis.DagConfig, reader DagReader, txSigner types.Signer, numOfThreads int) *Checker {
+func New(config *lachesis.Config, reader DagReader, txSigner types.Signer, numOfThreads int) *Checker {
 	return &Checker{
 		config:       config,
 		txSigner:     txSigner,
@@ -117,7 +117,7 @@ func (v *Checker) Enqueue(events dag.Events, onValidated OnValidatedFn) error {
 }
 
 // Validate event
-func (v *Checker) Validate(e *dag.Event) error {
+func (v *Checker) Validate(e dag.Event) error {
 	addrs, epoch := v.reader.GetEpochPubKeys()
 	if e.Epoch != epoch {
 		return epochcheck.ErrNotRelevant

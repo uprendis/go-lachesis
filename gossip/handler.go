@@ -57,7 +57,7 @@ func checkLenLimits(size int, v interface{}) error {
 type dagNotifier interface {
 	SubscribeNewEpoch(ch chan<- idx.Epoch) notify.Subscription
 	SubscribeNewPack(ch chan<- idx.Pack) notify.Subscription
-	SubscribeNewEmitted(ch chan<- *dag.Event) notify.Subscription
+	SubscribeNewEmitted(ch chan<- dag.Event) notify.Subscription
 }
 
 type ProtocolManager struct {
@@ -84,7 +84,7 @@ type ProtocolManager struct {
 	engineMu *sync.RWMutex
 
 	notifier         dagNotifier
-	emittedEventsCh  chan *dag.Event
+	emittedEventsCh  chan dag.Event
 	emittedEventsSub notify.Subscription
 	newPacksCh       chan idx.Pack
 	newPacksSub      notify.Subscription
@@ -148,7 +148,7 @@ func NewProtocolManager(
 
 func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.Fetcher, *ordering.EventBuffer) {
 	// checkers
-	firstCheck := func(e *dag.Event) error {
+	firstCheck := func(e dag.Event) error {
 		if err := checkers.Basiccheck.Validate(e); err != nil {
 			return err
 		}
@@ -157,8 +157,8 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 		}
 		return nil
 	}
-	bufferedCheck := func(e *dag.Event, parents []*dag.Event) error {
-		var selfParent *dag.Event
+	bufferedCheck := func(e dag.Event, parents []dag.Event) error {
+		var selfParent dag.Event
 		if e.SelfParent() != nil {
 			selfParent = parents[0]
 		}
@@ -174,7 +174,7 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 	// DAG callbacks
 	buffer := ordering.New(eventsBuffSize, ordering.Callback{
 
-		Process: func(e *dag.Event) error {
+		Process: func(e dag.Event) error {
 			now := time.Now()
 			pm.engineMu.Lock()
 			defer pm.engineMu.Unlock()
@@ -195,7 +195,7 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 			return nil
 		},
 
-		Drop: func(e *dag.Event, peer string, err error) {
+		Drop: func(e dag.Event, peer string, err error) {
 			if eventcheck.IsBan(err) {
 				log.Warn("Incoming event rejected", "event", e.ID().String(), "creator", e.Creator, "err", err)
 				pm.removePeer(peer)
@@ -206,7 +206,7 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 			return pm.store.HasEvent(id)
 		},
 
-		Get: func(id hash.Event) *dag.Event {
+		Get: func(id hash.Event) dag.Event {
 			return pm.store.GetEvent(id.Epoch(), id)
 		},
 
@@ -331,7 +331,7 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 
 	if pm.notifier != nil {
 		// broadcast mined events
-		pm.emittedEventsCh = make(chan *dag.Event, 4)
+		pm.emittedEventsCh = make(chan dag.Event, 4)
 		pm.emittedEventsSub = pm.notifier.SubscribeNewEmitted(pm.emittedEventsCh)
 		// broadcast packs
 		pm.newPacksCh = make(chan idx.Pack, 4)
@@ -522,7 +522,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if pm.fetcher.Overloaded() {
 			break
 		}
-		var events []*dag.Event
+		var events []dag.Event
 		if err := msg.Decode(&events); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
@@ -742,7 +742,7 @@ func (pm *ProtocolManager) decideBroadcastAggressiveness(size int, passed time.D
 
 // BroadcastEvent will either propagate a event to a subset of it's peers, or
 // will only announce it's availability (depending what's requested).
-func (pm *ProtocolManager) BroadcastEvent(event *dag.Event, passed time.Duration) int {
+func (pm *ProtocolManager) BroadcastEvent(event dag.Event, passed time.Duration) int {
 	if passed < 0 {
 		passed = 0
 	}

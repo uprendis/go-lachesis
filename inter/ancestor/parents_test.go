@@ -14,7 +14,6 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/kvdb/memorydb"
-	"github.com/Fantom-foundation/go-lachesis/logger"
 	"github.com/Fantom-foundation/go-lachesis/utils"
 	"github.com/Fantom-foundation/go-lachesis/vector"
 )
@@ -80,21 +79,21 @@ func testSpecialNamedParents(t *testing.T, asciiScheme string, exp map[int]map[s
 		return
 	}
 
-	ordered := make([]*dag.Event, 0)
+	ordered := make([]dag.Event, 0)
 	nodes, _, _ := tdag.ASCIIschemeForEach(asciiScheme, tdag.ForEachEvent{
-		Process: func(e *dag.Event, name string) {
+		Process: func(e dag.Event, name string) {
 			ordered = append(ordered, e)
 		},
 	})
 
 	validators := pos.EqualStakeValidators(nodes, 1)
 
-	events := make(map[hash.Event]*dag.Event)
-	getEvent := func(id hash.Event) *dag.Event {
+	events := make(map[hash.Event]dag.Event)
+	getEvent := func(id hash.Event) dag.Event {
 		return events[id]
 	}
 
-	vecClock := vector.NewIndex(vector.DefaultIndexConfig(), validators, memorydb.New(), getEvent)
+	vecClock := vector.NewIndex(vector.DefaultConfig(), validators, memorydb.New(), getEvent)
 
 	// build vector index
 	for _, e := range ordered {
@@ -103,7 +102,7 @@ func testSpecialNamedParents(t *testing.T, asciiScheme string, exp map[int]map[s
 	}
 
 	// divide events by stage
-	var stages [][]*dag.Event
+	var stages [][]dag.Event
 	for _, e := range ordered {
 		name := string(e.Extra)
 		stage := decode(name)

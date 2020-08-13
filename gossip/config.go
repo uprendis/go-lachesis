@@ -112,7 +112,7 @@ func DefaultConfig(network lachesis.Config) Config {
 	return cfg
 }
 
-// DefaultStoreConfig for product.
+// DefaultStoreConfig for livenet.
 func DefaultStoreConfig() StoreConfig {
 	return StoreConfig{
 		EventsCacheSize:        500,

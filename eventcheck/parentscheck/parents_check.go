@@ -18,18 +18,18 @@ var (
 
 // Checker which require only parents list + current epoch info
 type Checker struct {
-	config *lachesis.DagConfig
+	config *lachesis.Config
 }
 
 // New validator which performs checks, which require known the parents
-func New(config *lachesis.DagConfig) *Checker {
+func New(config *lachesis.Config) *Checker {
 	return &Checker{
 		config: config,
 	}
 }
 
 // Validate event
-func (v *Checker) Validate(e *dag.Event, parents []*dag.Event) error {
+func (v *Checker) Validate(e dag.Event, parents []dag.Event) error {
 	if len(e.Parents) != len(parents) {
 		panic("parentscheck: expected event's parents as an argument")
 	}

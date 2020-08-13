@@ -21,7 +21,7 @@ func Div(a, b uint64) uint64 {
 	return a * PercentUnit / b
 }
 
-// Get calculates f(x), where f is a piecewise linear function defined by the pieces
+// get calculates f(x), where f is a piecewise linear function defined by the pieces
 func Get(x uint64, pieces []Dot) uint64 {
 
 	// find a piece

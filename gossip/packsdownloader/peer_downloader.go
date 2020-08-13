@@ -13,8 +13,8 @@ import (
 
 const (
 	forceSyncPeriod = 5 * time.Minute        // Even if we synced up, in a case we're stalled, try to download a not pinned pack after the timeout
-	arriveTimeout   = 10 * time.Second       // Time allowance before an announced pack is explicitly requested
-	recheckInterval = 100 * time.Millisecond // Time between checking - was the arrived pack connected or not
+	arriveTimeout   = 10 * time.Second       // RawTime allowance before an announced pack is explicitly requested
+	recheckInterval = 100 * time.Millisecond // RawTime between checking - was the arrived pack connected or not
 
 	// Maximum number of stored packs per peer.
 	// Shouldn't be high, because we do binary search, so stored packs are O(log_2(total packs)) + PeerProgress broadcasts

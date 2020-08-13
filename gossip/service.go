@@ -60,7 +60,7 @@ func (f *ServiceFeed) SubscribeNewPack(ch chan<- idx.Pack) notify.Subscription {
 	return f.scope.Track(f.newPack.Subscribe(ch))
 }
 
-func (f *ServiceFeed) SubscribeNewEmitted(ch chan<- *dag.Event) notify.Subscription {
+func (f *ServiceFeed) SubscribeNewEmitted(ch chan<- dag.Event) notify.Subscription {
 	return f.scope.Track(f.newEmittedEvent.Subscribe(ch))
 }
 
@@ -215,7 +215,7 @@ func (s *Service) makeEmitter() *Emitter {
 			App:         s.app,
 			Txpool:      s.txpool,
 			OccurredTxs: s.occurredTxs,
-			OnEmitted: func(emitted *dag.Event) {
+			OnEmitted: func(emitted dag.Event) {
 				// s.engineMu is locked here
 
 				err := s.engine.ProcessEvent(emitted)
@@ -234,7 +234,7 @@ func (s *Service) makeEmitter() *Emitter {
 			PeersNum: func() int {
 				return s.pm.peers.Len()
 			},
-			AddVersion: func(e *dag.Event) *dag.Event {
+			AddVersion: func(e dag.Event) dag.Event {
 				// serialization version
 				e.Version = 0
 				// node version

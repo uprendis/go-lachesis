@@ -15,23 +15,23 @@ import (
 func TestEventBuffer(t *testing.T) {
 	nodes := tdag.GenNodes(5)
 
-	var ordered []*dag.Event
+	var ordered []dag.Event
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	_ = tdag.ForEachRandEvent(nodes, 10, 3, r, tdag.ForEachEvent{
-		Process: func(e *dag.Event, name string) {
+		Process: func(e dag.Event, name string) {
 			ordered = append(ordered, e)
 		},
-		Build: func(e *dag.Event, name string) *dag.Event {
+		Build: func(e dag.Event, name string) dag.Event {
 			e.Epoch = 1
-			e.ClaimedTime = inter.Timestamp(e.Seq)
+			e.ClaimedTime = dag.RawTimestamp(e.Seq)
 			return e
 		},
 	})
 
-	processed := make(map[hash.Event]*dag.Event)
+	processed := make(map[hash.Event]dag.Event)
 	buffer := New(len(nodes)*10, Callback{
 
-		Process: func(e *dag.Event) error {
+		Process: func(e dag.Event) error {
 			if _, ok := processed[e.ID()]; ok {
 				t.Fatalf("%s already processed", e.String())
 				return nil
@@ -46,7 +46,7 @@ func TestEventBuffer(t *testing.T) {
 			return nil
 		},
 
-		Drop: func(e *dag.Event, peer string, err error) {
+		Drop: func(e dag.Event, peer string, err error) {
 			t.Fatalf("%s unexpectedly dropped with %s", e.String(), err)
 		},
 
@@ -54,11 +54,11 @@ func TestEventBuffer(t *testing.T) {
 			return processed[e] != nil
 		},
 
-		Get: func(e hash.Event) *dag.Event {
+		Get: func(e hash.Event) dag.Event {
 			return processed[e]
 		},
 
-		Check: parentscheck.New(&lachesis.DagConfig{}).Validate,
+		Check: parentscheck.New(&lachesis.Config{}).Validate,
 	})
 
 	for _, rnd := range rand.Perm(len(ordered)) {

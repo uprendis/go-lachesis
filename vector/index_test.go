@@ -33,9 +33,9 @@ a2.1 ──╣      ║      ║      ║
 
 func BenchmarkIndex_Add(b *testing.B) {
 	b.StopTimer()
-	ordered := make([]*dag.Event, 0)
+	ordered := make([]dag.Event, 0)
 	nodes, _, _ := tdag.ASCIIschemeForEach(testASCIIScheme, tdag.ForEachEvent{
-		Process: func(e *dag.Event, name string) {
+		Process: func(e dag.Event, name string) {
 			ordered = append(ordered, e)
 		},
 	})
@@ -44,22 +44,26 @@ func BenchmarkIndex_Add(b *testing.B) {
 		validatorsBuilder.Set(peer, 1)
 	}
 	validators := validatorsBuilder.Build()
-	events := make(map[hash.Event]*dag.Event)
-	getEvent := func(id hash.Event) *dag.Event {
+	events := make(map[hash.Event]dag.Event)
+	getEvent := func(id hash.Event) dag.Event {
 		return events[id]
 	}
 	for _, e := range ordered {
-		events[e.ID()] = &e.Event
+		events[e.ID()] = e
 	}
 
-	vecClock := NewIndex(DefaultIndexConfig(), validators, memorydb.New(), getEvent)
+	vecClock := NewIndex(LiteConfig(), func(err error) { panic(err) })
+	vecClock.Reset(validators, memorydb.New(), getEvent)
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		vecClock.Reset(validators, memorydb.New(), getEvent)
 		b.StartTimer()
 		for _, e := range ordered {
-			vecClock.Add(&e.Event)
+			err := vecClock.Add(e)
+			if err != nil {
+				panic(err)
+			}
 			i++
 			if i >= b.N {
 				break

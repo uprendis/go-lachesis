@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"sort"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -278,34 +279,15 @@ func (hh OrderedEvents) String() string {
 	return buf.String()
 }
 
-// ToWire converts to simple slice.
-func (hh OrderedEvents) ToWire() [][]byte {
-	res := make([][]byte, len(hh))
-	for i, h := range hh {
-		res[i] = h.Bytes()
-	}
-
-	return res
-}
-
-// WireToOrderedEvents converts from simple slice.
-func WireToOrderedEvents(buf [][]byte) OrderedEvents {
-	if buf == nil {
-		return nil
-	}
-
-	hh := make(OrderedEvents, len(buf))
-	for i, b := range buf {
-		hh[i] = BytesToEvent(b)
-	}
-
-	return hh
-}
-
 func (hh OrderedEvents) Len() int      { return len(hh) }
 func (hh OrderedEvents) Swap(i, j int) { hh[i], hh[j] = hh[j], hh[i] }
 func (hh OrderedEvents) Less(i, j int) bool {
 	return bytes.Compare(hh[i].Bytes(), hh[j].Bytes()) < 0
+}
+
+// ByEpochAndLamport sorts events by epoch first, by lamport second, by ID third
+func (hh OrderedEvents) ByEpochAndLamport() {
+	sort.Sort(hh)
 }
 
 // Of returns hash of data

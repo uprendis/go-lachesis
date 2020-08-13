@@ -23,11 +23,11 @@ type DagReader interface {
 
 // Checker which require only current epoch info
 type Checker struct {
-	config *lachesis.DagConfig
+	config *lachesis.Config
 	reader DagReader
 }
 
-func New(config *lachesis.DagConfig, reader DagReader) *Checker {
+func New(config *lachesis.Config, reader DagReader) *Checker {
 	return &Checker{
 		config: config,
 		reader: reader,
@@ -35,7 +35,7 @@ func New(config *lachesis.DagConfig, reader DagReader) *Checker {
 }
 
 // Validate event
-func (v *Checker) Validate(e *dag.Event) error {
+func (v *Checker) Validate(e dag.Event) error {
 	// check epoch first, because validators group is known only for the current epoch
 	validators, epoch := v.reader.GetEpochValidators()
 	if e.Epoch != epoch {

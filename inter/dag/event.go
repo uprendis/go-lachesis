@@ -3,26 +3,21 @@ package dag
 import (
 	"fmt"
 	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 )
 
 type Event interface {
 	Epoch() idx.Epoch
 	Seq() idx.Event
-
 	Frame() idx.Frame
 	IsRoot() bool
-
 	Creator() idx.StakerID
+	Lamport() idx.Lamport
+	RawTime() RawTimestamp
 
 	Parents() hash.Events
 	SelfParent() *hash.Event
 	IsSelfParent(hash hash.Event) bool
-
-	Lamport() idx.Lamport
-	ClaimedTime() inter.Timestamp
-	MedianTime() inter.Timestamp
 
 	ID() hash.Event
 
@@ -33,17 +28,13 @@ type MutableEvent interface {
 	Event
 	SetEpoch(idx.Epoch)
 	SetSeq(idx.Event)
-
 	SetFrame(idx.Frame)
 	SetIsRoot(bool)
-
 	SetCreator(idx.StakerID)
+	SetLamport(idx.Lamport)
+	SetRawTime(RawTimestamp)
 
 	SetParents(hash.Events)
-
-	SetLamport(idx.Lamport)
-	SetClaimedTime(inter.Timestamp)
-	SetMedianTime(inter.Timestamp)
 
 	SetID(id [24]byte)
 }
@@ -63,9 +54,9 @@ type BaseEvent struct {
 
 	parents hash.Events
 
-	lamport     idx.Lamport
-	claimedTime inter.Timestamp
-	medianTime  inter.Timestamp
+	lamport idx.Lamport
+
+	rawTime RawTimestamp
 
 	id hash.Event
 }
@@ -73,7 +64,6 @@ type BaseEvent struct {
 type MutableBaseEvent struct {
 	BaseEvent
 }
-//type MutableBaseEvent BaseEvent
 
 // Build build immutable event
 func (me *MutableBaseEvent) Build(r_id [24]byte) *BaseEvent {
@@ -127,9 +117,7 @@ func (e *BaseEvent) Parents() hash.Events { return e.parents }
 
 func (e *BaseEvent) Lamport() idx.Lamport { return e.lamport }
 
-func (e *BaseEvent) ClaimedTime() inter.Timestamp { return e.claimedTime }
-
-func (e *BaseEvent) MedianTime() inter.Timestamp { return e.medianTime }
+func (e *BaseEvent) RawTime() RawTimestamp { return e.rawTime }
 
 func (e *BaseEvent) ID() hash.Event { return e.id }
 
@@ -147,9 +135,7 @@ func (e *MutableBaseEvent) SetParents(v hash.Events) { e.parents = v }
 
 func (e *MutableBaseEvent) SetLamport(v idx.Lamport) { e.lamport = v }
 
-func (e *MutableBaseEvent) SetClaimedTime(v inter.Timestamp) { e.claimedTime = v }
-
-func (e *MutableBaseEvent) SetMedianTime(v inter.Timestamp) { e.medianTime = v }
+func (e *MutableBaseEvent) SetRawTime(v RawTimestamp) { e.rawTime = v }
 
 func (e *MutableBaseEvent) SetID(r_id [24]byte) {
 	copy(e.id[0:4], e.epoch.Bytes())
