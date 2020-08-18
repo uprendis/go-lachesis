@@ -70,3 +70,7 @@ require (
 replace gopkg.in/urfave/cli.v1 => github.com/urfave/cli v1.20.0
 
 replace github.com/ethereum/go-ethereum => github.com/Fantom-foundation/go-ethereum v1.9.8-ftm-0.10
+
+replace github.com/Fantom-foundation/lachesis-base => github.com/uprendis/lachesis-base v0.0.0-20200817063655-05d7858ba3bd
+
+replace github.com/uprendis/lachesis-base => github.com/uprendis/lachesis-base v0.0.0-20200817063655-05d7858ba3bd
