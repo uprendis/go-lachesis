@@ -2,6 +2,7 @@ package gossip
 
 import (
 	"errors"
+	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
 	"math/big"
 	"time"
 
@@ -392,10 +393,10 @@ func (s *Service) applyBlock(block *inter.Block, decidedFrame idx.Frame, cheater
 }
 
 // selectValidatorsGroup is a callback type to select new validators group
-func (s *Service) selectValidatorsGroup(oldEpoch, newEpoch idx.Epoch) (newValidators *pos.Validators) {
+func (s *Service) selectValidatorsGroup(oldEpoch, newEpoch idx.Epoch) (newValidators *genesis.Validators) {
 	// s.engineMu is locked here
 
-	builder := pos.NewBuilder()
+	builder := genesis.NewBuilder()
 	for _, it := range s.app.GetEpochValidators(newEpoch) {
 		builder.Set(it.StakerID, pos.BalanceToStake(it.Staker.CalcTotalStake()))
 	}

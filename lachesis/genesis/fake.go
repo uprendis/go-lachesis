@@ -5,13 +5,12 @@ import (
 
 	"github.com/Fantom-foundation/go-lachesis/crypto"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 )
 
 // FakeValidators returns validators accounts for fakenet
 func FakeValidators(count int, balance *big.Int, stake *big.Int) VAccounts {
 	accs := make(Accounts, count)
-	validators := make(pos.GValidators, 0, count)
+	validators := make(GValidators, 0, count)
 
 	for i := 1; i <= count; i++ {
 		key := crypto.FakeKey(i)
@@ -21,7 +20,7 @@ func FakeValidators(count int, balance *big.Int, stake *big.Int) VAccounts {
 			PrivateKey: key,
 		}
 		stakerID := idx.StakerID(i)
-		validators = append(validators, pos.GenesisValidator{
+		validators = append(validators, GenesisValidator{
 			ID:      stakerID,
 			Address: addr,
 			Stake:   stake,

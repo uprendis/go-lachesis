@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
 	"math/big"
 	"strconv"
 	"strings"
@@ -29,7 +30,6 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/hash"
 	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/inter/sfctype"
 	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis/sfc"
 	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis/sfc/sfcpos"
@@ -242,7 +242,7 @@ func (b *EthAPIBackend) ForEachEpochEvent(ctx context.Context, epoch rpc.BlockNu
 	return nil
 }
 
-func (b *EthAPIBackend) GetValidators(ctx context.Context) *pos.Validators {
+func (b *EthAPIBackend) GetValidators(ctx context.Context) *genesis.Validators {
 	return b.svc.engine.GetValidators()
 }
 

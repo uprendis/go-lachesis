@@ -1,12 +1,12 @@
 package sfc
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis/sfc/sfcpos"
 	"github.com/Fantom-foundation/go-lachesis/utils"
 )
@@ -30,7 +30,7 @@ var ContractAddress = common.HexToAddress("0xfc00face000000000000000000000000000
 var ContractAddressV1 = common.HexToAddress("0xfc00beef00000000000000000000000000000101")
 
 // AssembleStorage builds genesis storage for the SFC contract
-func AssembleStorage(validators pos.GValidators, genesisTime inter.Timestamp, owner common.Address, storage map[common.Hash]common.Hash) map[common.Hash]common.Hash {
+func AssembleStorage(validators genesis.GValidators, genesisTime inter.Timestamp, owner common.Address, storage map[common.Hash]common.Hash) map[common.Hash]common.Hash {
 	if storage == nil {
 		storage = make(map[common.Hash]common.Hash)
 	}

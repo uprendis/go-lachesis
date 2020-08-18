@@ -2,6 +2,7 @@ package gossip
 
 import (
 	"fmt"
+	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
 	"math/rand"
 	"strings"
 	"sync"
@@ -503,7 +504,7 @@ var (
 )
 
 // OnNewEpoch should be called after each epoch change, and on startup
-func (em *Emitter) OnNewEpoch(newValidators *pos.Validators, newEpoch idx.Epoch) {
+func (em *Emitter) OnNewEpoch(newValidators *genesis.Validators, newEpoch idx.Epoch) {
 	// update myStakerID
 	em.myStakerID, _ = em.findMyStakerID()
 	em.prevEmittedTime = em.loadPrevEmitTime()

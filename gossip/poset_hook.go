@@ -1,12 +1,12 @@
 package gossip
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
 	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/vector"
 )
 
@@ -58,9 +58,9 @@ func (hook *HookedEngine) GetEpoch() idx.Epoch {
 }
 
 // GetEpochValidators atomically returns validators of current epoch, and the epoch.
-func (hook *HookedEngine) GetEpochValidators() (*pos.Validators, idx.Epoch) {
+func (hook *HookedEngine) GetEpochValidators() (*genesis.Validators, idx.Epoch) {
 	if hook.engine == nil {
-		return pos.EmptyValidators, 1
+		return genesis.EmptyValidators, 1
 	}
 	return hook.engine.GetEpochValidators()
 }
@@ -74,9 +74,9 @@ func (hook *HookedEngine) LastBlock() (idx.Block, hash.Event) {
 }
 
 // GetValidators returns validators of current epoch.
-func (hook *HookedEngine) GetValidators() *pos.Validators {
+func (hook *HookedEngine) GetValidators() *genesis.Validators {
 	if hook.engine == nil {
-		return pos.EmptyValidators
+		return genesis.EmptyValidators
 	}
 	return hook.engine.GetValidators()
 }

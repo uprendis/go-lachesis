@@ -2,13 +2,13 @@ package gaspowercheck
 
 import (
 	"errors"
+	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
 	"math/big"
 	"time"
 
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/epochcheck"
 	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 )
 
 var (
@@ -20,7 +20,7 @@ var (
 type ValidationContext struct {
 	Epoch                idx.Epoch
 	Configs              [2]Config
-	Validators           *pos.Validators
+	Validators           *genesis.Validators
 	PrevEpochLastHeaders inter.HeadersByCreator
 	PrevEpochEndTime     inter.Timestamp
 	PrevEpochRefunds     map[idx.StakerID]uint64
@@ -62,7 +62,7 @@ func div(a *big.Int, b uint64) {
 
 func calcValidatorGasPowerPerSec(
 	validator idx.StakerID,
-	validators *pos.Validators,
+	validators *genesis.Validators,
 	config *Config,
 ) (
 	perSec uint64,

@@ -10,8 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
-
-	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 )
 
 // Accounts specifies the initial state that is part of the genesis block.
@@ -43,7 +41,7 @@ type (
 
 	VAccounts struct {
 		Accounts         Accounts
-		Validators       pos.GValidators
+		Validators       GValidators
 		SfcContractAdmin common.Address
 	}
 )

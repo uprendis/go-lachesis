@@ -1,12 +1,12 @@
 package gossip
 
 import (
+	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/Fantom-foundation/go-lachesis/hash"
 	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/vector"
 )
 
@@ -25,9 +25,9 @@ type Consensus interface {
 	// GetEpoch returns current epoch num.
 	GetEpoch() idx.Epoch
 	// GetValidators returns validators of current epoch.
-	GetValidators() *pos.Validators
+	GetValidators() *genesis.Validators
 	// GetEpochValidators atomically returns validators of current epoch, and the epoch.
-	GetEpochValidators() (*pos.Validators, idx.Epoch)
+	GetEpochValidators() (*genesis.Validators, idx.Epoch)
 	// GetConsensusTime calc consensus timestamp for given event.
 	GetConsensusTime(id hash.Event) (inter.Timestamp, error)
 

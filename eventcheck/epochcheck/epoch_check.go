@@ -2,10 +2,10 @@ package epochcheck
 
 import (
 	"errors"
+	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
 
 	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/lachesis"
 )
 
@@ -18,7 +18,7 @@ var (
 
 // DagReader is accessed by the validator to get the current state.
 type DagReader interface {
-	GetEpochValidators() (*pos.Validators, idx.Epoch)
+	GetEpochValidators() (*genesis.Validators, idx.Epoch)
 }
 
 // Checker which require only current epoch info
