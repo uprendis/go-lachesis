@@ -12,18 +12,18 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/Fantom-foundation/go-lachesis/hash"
+	
 	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
+	"github.com/Fantom-foundation/go-lachesis/network"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis"
 	"github.com/Fantom-foundation/go-lachesis/poset"
 )
 
 // newTestProtocolManager creates a new protocol manager for testing purposes,
 // with the given number of events already known from each node
 func newTestProtocolManager(nodesNum int, eventsNum int, newtx chan<- []*types.Transaction, onNewEvent func(e *inter.Event)) (*ProtocolManager, *Store, error) {
-	net := lachesis.FakeNetConfig(genesis.FakeValidators(nodesNum, big.NewInt(0), pos.StakeToBalance(1)))
+	net := network.FakeNetConfig(genesis.FakeValidators(nodesNum, big.NewInt(0), pos.StakeToBalance(1)))
 
 	config := DefaultConfig(net)
 	config.TxPool.Journal = ""
@@ -148,17 +148,17 @@ func newTestPeer(name string, version int, pm *ProtocolManager, shake bool) (*te
 // handshake simulates a trivial handshake that expects the same state from the
 // remote side as we are simulating locally.
 func (p *testPeer) handshake(t *testing.T, progress *PeerProgress, genesis common.Hash) {
-	msg := &ethStatusData{
+	msg := &statusData{
 		ProtocolVersion:   uint32(p.version),
-		NetworkID:         lachesis.FakeNetworkID,
+		NetworkID:         network.FakeNetworkID,
 		Genesis:           genesis,
 		DummyTD:           big.NewInt(int64(progress.NumOfBlocks)), // for ETH clients
 		DummyCurrentBlock: common.Hash(progress.LastBlock),
 	}
-	if err := p2p.ExpectMsg(p.app, EthStatusMsg, msg); err != nil {
+	if err := p2p.ExpectMsg(p.app, StatusMsg, msg); err != nil {
 		t.Fatalf("status recv: %v", err)
 	}
-	if err := p2p.Send(p.app, EthStatusMsg, msg); err != nil {
+	if err := p2p.Send(p.app, StatusMsg, msg); err != nil {
 		t.Fatalf("status send: %v", err)
 	}
 	if err := p2p.ExpectMsg(p.app, ProgressMsg, progress); err != nil {

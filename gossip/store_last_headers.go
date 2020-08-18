@@ -1,10 +1,10 @@
 package gossip
 
 import (
+	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 )
 
 // DelLastHeader deletes record about last header from a validator
@@ -25,8 +25,8 @@ func (s *Store) DelLastHeaders(epoch idx.Epoch) {
 }
 
 // AddLastHeader adds/updates a records about last header from a validator
-func (s *Store) AddLastHeader(epoch idx.Epoch, header *inter.EventHeaderData) {
-	key := append(epoch.Bytes(), header.Creator.Bytes()...)
+func (s *Store) AddLastHeader(epoch idx.Epoch, header *inter.Event) {
+	key := append(epoch.Bytes(), header.Creator().Bytes()...)
 
 	s.set(s.table.LastEpochHeaders, key, header)
 }
@@ -39,7 +39,7 @@ func (s *Store) GetLastHeaders(epoch idx.Epoch) inter.HeadersByCreator {
 	defer it.Release()
 	for it.Next() {
 		creator := it.Key()[4:]
-		header := &inter.EventHeaderData{}
+		header := &inter.Event{}
 		err := rlp.DecodeBytes(it.Value(), header)
 		if err != nil {
 			s.Log.Crit("Failed to decode rlp", "err", err)

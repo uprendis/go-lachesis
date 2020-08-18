@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis"
+	"github.com/Fantom-foundation/lachesis-base/hash"
+	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"math/big"
 	"strconv"
 	"strings"
@@ -27,12 +29,12 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/ethapi"
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
 	"github.com/Fantom-foundation/go-lachesis/gossip/gasprice"
-	"github.com/Fantom-foundation/go-lachesis/hash"
+	
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
+
 	"github.com/Fantom-foundation/go-lachesis/inter/sfctype"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis/sfc"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis/sfc/sfcpos"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis/sfc"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis/sfc/sfcpos"
 	"github.com/Fantom-foundation/go-lachesis/topicsdb"
 	"github.com/Fantom-foundation/go-lachesis/tracing"
 )
@@ -157,8 +159,8 @@ func (b *EthAPIBackend) GetEvent(ctx context.Context, shortEventID string) (*int
 	return b.svc.store.GetEvent(id), nil
 }
 
-// GetEventHeader returns the Lachesis event header by hash or short ID.
-func (b *EthAPIBackend) GetEventHeader(ctx context.Context, shortEventID string) (*inter.EventHeaderData, error) {
+// GetEvent returns the Lachesis event header by hash or short ID.
+func (b *EthAPIBackend) GetEvent(ctx context.Context, shortEventID string) (*inter.Event, error) {
 	id, err := b.GetFullEventID(shortEventID)
 	if err != nil {
 		return nil, err
@@ -167,7 +169,7 @@ func (b *EthAPIBackend) GetEventHeader(ctx context.Context, shortEventID string)
 	if epoch != b.svc.engine.GetEpoch() {
 		return nil, errors.New("event headers are stored only for current epoch")
 	}
-	return b.svc.store.GetEventHeader(epoch, id), nil
+	return b.svc.store.GetEvent(epoch, id), nil
 }
 
 // GetConsensusTime returns event's consensus time, if event is confirmed.

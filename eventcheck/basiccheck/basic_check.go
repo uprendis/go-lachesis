@@ -8,8 +8,8 @@ import (
 
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/params"
+	"github.com/Fantom-foundation/go-lachesis/network"
+	"github.com/Fantom-foundation/go-lachesis/network/params"
 )
 
 var (
@@ -29,11 +29,11 @@ var (
 )
 
 type Checker struct {
-	config *lachesis.DagConfig
+	config *network.DagConfig
 }
 
 // New validator which performs checks which don't require anything except event
-func New(config *lachesis.DagConfig) *Checker {
+func New(config *network.DagConfig) *Checker {
 	return &Checker{
 		config: config,
 	}
@@ -70,7 +70,7 @@ func (v *Checker) checkTxs(e *inter.Event) error {
 	return nil
 }
 
-func CalcGasPowerUsed(e *inter.Event, config *lachesis.DagConfig) uint64 {
+func CalcGasPowerUsed(e *inter.Event, config *network.DagConfig) uint64 {
 	txsGas := uint64(0)
 	for _, tx := range e.Transactions {
 		txsGas += tx.Gas()

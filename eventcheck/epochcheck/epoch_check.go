@@ -2,11 +2,11 @@ package epochcheck
 
 import (
 	"errors"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis"
 
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
+
+	"github.com/Fantom-foundation/go-lachesis/network"
 )
 
 var (
@@ -23,11 +23,11 @@ type DagReader interface {
 
 // Checker which require only current epoch info
 type Checker struct {
-	config *lachesis.DagConfig
+	config *network.DagConfig
 	reader DagReader
 }
 
-func New(config *lachesis.DagConfig, reader DagReader) *Checker {
+func New(config *network.DagConfig, reader DagReader) *Checker {
 	return &Checker{
 		config: config,
 		reader: reader,

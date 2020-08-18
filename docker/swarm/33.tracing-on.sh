@@ -4,7 +4,7 @@ cd $(dirname $0)
 
 
 docker $SWARM service create \
-  --network lachesis \
+  --network network \
   --name tracing \
   --publish 16686:16686 \
   --replicas 1 \

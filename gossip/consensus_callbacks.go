@@ -2,7 +2,7 @@ package gossip
 
 import (
 	"errors"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis"
 	"math/big"
 	"time"
 
@@ -17,7 +17,7 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/epochcheck"
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
+
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/tracing"
 )
@@ -42,13 +42,13 @@ func (s *Service) ValidateEvent(e *inter.Event) error {
 	if e.Epoch != s.engine.GetEpoch() {
 		return epochcheck.ErrNotRelevant
 	}
-	if s.store.HasEventHeader(e.Hash()) {
+	if s.store.HasEvent(e.Hash()) {
 		return eventcheck.ErrAlreadyConnectedEvent
 	}
-	parents := make([]*inter.EventHeaderData, 0, len(e.Parents))
+	parents := make([]*inter.Event, 0, len(e.Parents))
 	epoch := e.Epoch
 	for _, id := range e.Parents {
-		header := s.store.GetEventHeader(epoch, id)
+		header := s.store.GetEvent(epoch, id)
 		if header == nil {
 			return errors.New("out of order")
 		}
@@ -64,7 +64,7 @@ func (s *Service) processEvent(realEngine Consensus, e *inter.Event) error {
 		return errStopped
 	}
 
-	if s.store.HasEventHeader(e.Hash()) { // sanity check
+	if s.store.HasEvent(e.Hash()) { // sanity check
 		return eventcheck.ErrAlreadyConnectedEvent
 	}
 
@@ -405,7 +405,7 @@ func (s *Service) selectValidatorsGroup(oldEpoch, newEpoch idx.Epoch) (newValida
 }
 
 // onEventConfirmed is callback type to notify about event confirmation
-func (s *Service) onEventConfirmed(header *inter.EventHeaderData, seqDepth idx.Event) {
+func (s *Service) onEventConfirmed(header *inter.Event, seqDepth idx.Event) {
 	// s.engineMu is locked here
 
 	if !header.NoTransactions() {
@@ -425,7 +425,7 @@ func (s *Service) onEventConfirmed(header *inter.EventHeaderData, seqDepth idx.E
 }
 
 // isEventAllowedIntoBlock is callback type to check is event may be within block or not
-func (s *Service) isEventAllowedIntoBlock(header *inter.EventHeaderData, seqDepth idx.Event) bool {
+func (s *Service) isEventAllowedIntoBlock(header *inter.Event, seqDepth idx.Event) bool {
 	// s.engineMu is locked here
 
 	if header.NoTransactions() {

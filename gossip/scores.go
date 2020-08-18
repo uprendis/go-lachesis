@@ -8,7 +8,7 @@ import (
 
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
+
 )
 
 const (
@@ -27,7 +27,7 @@ func (s *Service) updateOriginationScores(block *inter.Block, evmBlock *evmcore.
 				"block", txEventPos.Block, "block_got", block.Index)
 		}
 
-		txEvent := s.store.GetEventHeader(txEventPos.Event.Epoch(), txEventPos.Event)
+		txEvent := s.store.GetEvent(txEventPos.Event.Epoch(), txEventPos.Event)
 		// sanity check
 		if txEvent == nil {
 			s.Log.Crit("Incorrect tx event position", "tx", receipts[i].TxHash, "event", txEventPos.Event, "reason", "event has no transactions")

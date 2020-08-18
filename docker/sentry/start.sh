@@ -34,7 +34,7 @@ docker-compose run --rm web upgrade
 
 
 echo -e "\nGet network address\n"
-ip=$(docker network inspect -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}' lachesis)
+ip=$(docker network inspect -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}' network)
 echo $ip
 
 

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-PROG=lachesis
+PROG=network
 
-# kill all lachesis processes
+# kill all network processes
 pkill "${PROG}"
 
 # remove demo data
-rm -rf /tmp/lachesis-demo/datadir/
+rm -rf /tmp/network-demo/datadir/

@@ -21,7 +21,7 @@ do
 	--net=${NETWORK} --name=${NAME} \
 	--cpus=${LIMIT_CPU} --blkio-weight=${LIMIT_IO} \
 	-p ${RPCP}:18545 \
-	lachesis:${TAG} \
+	network:${TAG} \
 	--fakenet=${ACC}/$N,/tmp/test_accs.json \
 	--port=5050 \
 	--rpc --rpcaddr="0.0.0.0" --rpcport=18545 --rpcvhosts="*" --rpccorsdomain="*" --rpcapi="eth,debug,admin,web3,personal,net,txpool,ftm,sfc" \
@@ -41,7 +41,7 @@ attach_and_exec() {
             echo "  - attempt ${attempt}: " >&2
         fi;
 
-        res=$(docker exec -i ${NAME} /lachesis --exec "${CMD}" attach http://127.0.0.1:18545 2> /dev/null)
+        res=$(docker exec -i ${NAME} /network --exec "${CMD}" attach http://127.0.0.1:18545 2> /dev/null)
         if [ $? -eq 0 ]
         then
             echo $res

@@ -19,13 +19,13 @@ do
     RPCP=$(($RPCP_BASE+$i))
     WSP=$(($WSP_BASE+$i))
     ACC=$(($i+1))
-    (go run ../cmd/lachesis \
+    (go run ../cmd/network \
 	--datadir=${DATADIR} \
 	--fakenet=${ACC}/$N,test_accs.json \
 	--port=${PORT} \
 	--rpc --rpcaddr="127.0.0.1" --rpcport=${RPCP} --rpccorsdomain="*" --rpcapi="eth,debug,admin,web3,personal,txpool,ftm,sfc" \
 	--ws --wsaddr="127.0.0.1" --wsport=${WSP} --wsorigins="*" --wsapi="eth,debug,admin,web3,personal,txpool,ftm,sfc" \
-	--nousb --verbosity=3 --tracing &> .lachesis$i.log)&
+	--nousb --verbosity=3 --tracing &> .network$i.log)&
 done
 
 attach_and_exec() {
@@ -40,7 +40,7 @@ attach_and_exec() {
             echo "  - attempt ${attempt}: " >&2
         fi;
 
-        res=$(go run ../cmd/lachesis --exec "${CMD}" attach http://127.0.0.1:${RPCP} 2> /dev/null)
+        res=$(go run ../cmd/network --exec "${CMD}" attach http://127.0.0.1:${RPCP} 2> /dev/null)
         if [ $? -eq 0 ]
         then
             #echo "success" >&2

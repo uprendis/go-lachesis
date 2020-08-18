@@ -4,7 +4,7 @@ import (
 	"math/big"
 
 	"github.com/Fantom-foundation/go-lachesis/crypto"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
+
 )
 
 // FakeValidators returns validators accounts for fakenet

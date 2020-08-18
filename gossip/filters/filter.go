@@ -29,7 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
-	"github.com/Fantom-foundation/go-lachesis/hash"
+	
 	"github.com/Fantom-foundation/go-lachesis/topicsdb"
 )
 

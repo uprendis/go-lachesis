@@ -10,11 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/Fantom-foundation/go-lachesis/hash"
+	
 	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
+	"github.com/Fantom-foundation/go-lachesis/network"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis"
 	"github.com/Fantom-foundation/go-lachesis/logger"
 )
 
@@ -22,7 +22,7 @@ func TestGetGenesisBlock(t *testing.T) {
 	logger.SetTestMode(t)
 	assertar := assert.New(t)
 
-	net := lachesis.FakeNetConfig(genesis.FakeValidators(5, big.NewInt(0), pos.StakeToBalance(1)))
+	net := network.FakeNetConfig(genesis.FakeValidators(5, big.NewInt(0), pos.StakeToBalance(1)))
 	addrWithStorage := net.Genesis.Alloc.Accounts.Addresses()[0]
 	accountWithCode := net.Genesis.Alloc.Accounts[addrWithStorage]
 	accountWithCode.Code = []byte{1, 2, 3}
@@ -69,7 +69,7 @@ func TestGetBlock(t *testing.T) {
 	logger.SetTestMode(t)
 	assertar := assert.New(t)
 
-	net := lachesis.FakeNetConfig(genesis.FakeValidators(5, big.NewInt(0), pos.StakeToBalance(1)))
+	net := network.FakeNetConfig(genesis.FakeValidators(5, big.NewInt(0), pos.StakeToBalance(1)))
 
 	store := NewMemStore()
 	genesisHash, _, _, err := store.ApplyGenesis(&net)

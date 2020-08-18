@@ -11,8 +11,8 @@ LIMIT_CPU=$(echo "scale=2; 1/$N" | bc)
 LIMIT_IO=$(echo "500/$N" | bc)
 
 #
-PROG=lachesis
-EXEC=../build/lachesis
+PROG=network
+EXEC=../build/network
 
 # default ip using localhost
 IP=127.0.0.1
@@ -21,7 +21,7 @@ IP=127.0.0.1
 #PORT=18540
 PORT=4000
 
-declare -r LACHESIS_BASE_DIR=/tmp/lachesis-demo
+declare -r LACHESIS_BASE_DIR=/tmp/network-demo
 
 
 echo -e "\nStart $N nodes:"

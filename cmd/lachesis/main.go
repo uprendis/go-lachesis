@@ -29,7 +29,7 @@ import (
 
 const (
 	// clientIdentifier to advertise over the network.
-	clientIdentifier = "go-lachesis"
+	clientIdentifier = "go-network"
 )
 
 var (
@@ -37,7 +37,7 @@ var (
 	gitCommit = ""
 	gitDate   = ""
 	// The app that holds all commands and flags.
-	app = utils.NewApp(gitCommit, gitDate, "the go-lachesis command line interface")
+	app = utils.NewApp(gitCommit, gitDate, "the go-network command line interface")
 
 	testFlags    []cli.Flag
 	nodeFlags    []cli.Flag
@@ -200,7 +200,7 @@ func main() {
 	}
 }
 
-// lachesis is the main entry point into the system if no special subcommand is ran.
+// network is the main entry point into the system if no special subcommand is ran.
 // It creates a default node based on the command line arguments and runs it in
 // blocking mode, waiting for it to be shut down.
 func lachesisMain(ctx *cli.Context) error {
@@ -280,7 +280,7 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	events := make(chan accounts.WalletEvent, 16)
 	stack.AccountManager().Subscribe(events)
 
-	// Create a client to interact with local lachesis node.
+	// Create a client to interact with local network node.
 	rpcClient, err := stack.Attach()
 	if err != nil {
 		utils.Fatalf("Failed to attach to self: %v", err)

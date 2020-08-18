@@ -10,11 +10,11 @@ import (
 
 	"github.com/Fantom-foundation/go-lachesis/app"
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
+
 	"github.com/Fantom-foundation/go-lachesis/inter/sfctype"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis/sfc"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis/sfc/sfcpos"
+	"github.com/Fantom-foundation/go-lachesis/network"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis/sfc"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis/sfc/sfcpos"
 	"github.com/Fantom-foundation/go-lachesis/utils"
 )
 
@@ -80,7 +80,7 @@ func (s *Service) calcRewardWeights(stakers []sfctype.SfcStakerAndID, _epochDura
 		// origination score is roughly proportional to {validation score} * {stake}, so the whole formula is roughly
 		// {stake} * {validation score} ^ 2
 		poiWithRatio := new(big.Int).Mul(pois[i], s.config.Net.Economy.TxRewardPoiImpact)
-		poiWithRatio.Div(poiWithRatio, lachesis.PercentUnit)
+		poiWithRatio.Div(poiWithRatio, network.PercentUnit)
 
 		txRewardWeight := new(big.Int).Add(originationScores[i], poiWithRatio)
 		txRewardWeight.Mul(txRewardWeight, validationScores[i])

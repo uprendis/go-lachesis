@@ -8,5 +8,5 @@ shift
 
 RPCP=$(($RPCP_BASE+$i))
 
-docker run --rm -i lachesis:${TAG} $@ attach http://${SWARM_HOST}:${RPCP}
+docker run --rm -i network:${TAG} $@ attach http://${SWARM_HOST}:${RPCP}
 

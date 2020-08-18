@@ -3,5 +3,5 @@ cd $(dirname $0)
 
 docker stop prometheus
 killall tx-storm
-killall lachesis
+killall network
 docker stop tracing

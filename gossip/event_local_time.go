@@ -1,9 +1,9 @@
 package gossip
 
 import (
-	"github.com/Fantom-foundation/go-lachesis/hash"
+	
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
+
 )
 
 // SetBlockDecidedBy stores event which decided block (off-chain data)

@@ -21,7 +21,7 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
 	"github.com/Fantom-foundation/go-lachesis/gossip"
 	"github.com/Fantom-foundation/go-lachesis/gossip/gasprice"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
+	"github.com/Fantom-foundation/go-lachesis/network"
 )
 
 var (
@@ -93,8 +93,8 @@ func loadAllConfigs(file string, cfg *config) error {
 	return err
 }
 
-func defaultLachesisConfig(ctx *cli.Context) lachesis.Config {
-	var cfg lachesis.Config
+func defaultLachesisConfig(ctx *cli.Context) network.Config {
+	var cfg network.Config
 
 	switch {
 	case ctx.GlobalIsSet(FakeNetFlag.Name):
@@ -102,11 +102,11 @@ func defaultLachesisConfig(ctx *cli.Context) lachesis.Config {
 		if err != nil {
 			log.Crit("Invalid flag", "flag", FakeNetFlag.Name, "err", err)
 		}
-		cfg = lachesis.FakeNetConfig(accs)
+		cfg = network.FakeNetConfig(accs)
 	case ctx.GlobalBool(utils.TestnetFlag.Name):
-		cfg = lachesis.TestNetConfig()
+		cfg = network.TestNetConfig()
 	default:
-		cfg = lachesis.MainNetConfig()
+		cfg = network.MainNetConfig()
 	}
 
 	return cfg
@@ -259,7 +259,7 @@ func defaultNodeConfig() node.Config {
 	cfg.Version = params.VersionWithCommit(gitCommit, gitDate)
 	cfg.HTTPModules = append(cfg.HTTPModules, "eth", "ftm", "sfc", "web3")
 	cfg.WSModules = append(cfg.WSModules, "eth", "ftm", "sfc", "web3")
-	cfg.IPCPath = "lachesis.ipc"
+	cfg.IPCPath = "network.ipc"
 	cfg.DataDir = DefaultDataDir()
 	return cfg
 }

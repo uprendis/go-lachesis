@@ -11,7 +11,7 @@ do
   PART=$(($i+1))
 
   docker $SWARM service create \
-    --network lachesis \
+    --network network \
     --hostname="{{.Service.Name}}" \
     --name ${NAME} \
     --replicas 1 \

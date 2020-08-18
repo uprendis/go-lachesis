@@ -2,15 +2,14 @@ package gossip
 
 import (
 	"fmt"
+	"github.com/Fantom-foundation/go-lachesis/inter"
+	"github.com/Fantom-foundation/lachesis-base/hash"
+	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/Fantom-foundation/go-lachesis/hash"
-	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/inter/sfctype"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
+	"github.com/Fantom-foundation/go-lachesis/network"
 )
 
 // GenesisMismatchError is raised when trying to overwrite an existing
@@ -25,7 +24,7 @@ func (e *GenesisMismatchError) Error() string {
 }
 
 // ApplyGenesis writes initial state.
-func (s *Store) ApplyGenesis(net *lachesis.Config) (genesisAtropos hash.Event, genesisState common.Hash, new bool, err error) {
+func (s *Store) ApplyGenesis(net *network.Config) (genesisAtropos hash.Event, genesisState common.Hash, new bool, err error) {
 	storedGenesis := s.GetBlock(0)
 	if storedGenesis != nil {
 		newHash := calcGenesisHash(net)
@@ -47,7 +46,7 @@ func (s *Store) ApplyGenesis(net *lachesis.Config) (genesisAtropos hash.Event, g
 }
 
 // calcGenesisHash calcs hash of genesis state.
-func calcGenesisHash(net *lachesis.Config) hash.Event {
+func calcGenesisHash(net *network.Config) hash.Event {
 	s := NewMemStore()
 	defer s.Close()
 
@@ -56,14 +55,14 @@ func calcGenesisHash(net *lachesis.Config) hash.Event {
 	return h
 }
 
-func (s *Store) applyGenesis(net *lachesis.Config) (genesisAtropos hash.Event, genesisState common.Hash, err error) {
+func (s *Store) applyGenesis(net *network.Config) (genesisAtropos hash.Event, genesisState common.Hash, err error) {
 	// apply app genesis
 	state, err := s.app.ApplyGenesis(net)
 	if err != nil {
 		return genesisAtropos, genesisState, err
 	}
 
-	prettyHash := func(net *lachesis.Config) hash.Event {
+	prettyHash := func(net *network.Config) hash.Event {
 		e := inter.NewEvent()
 		// for nice-looking ID
 		e.Epoch = 0
@@ -78,25 +77,12 @@ func (s *Store) applyGenesis(net *lachesis.Config) (genesisAtropos hash.Event, g
 	genesisAtropos = prettyHash(net)
 	genesisState = common.Hash(genesisAtropos)
 
-	block := inter.NewBlock(0,
-		net.Genesis.Time,
-		genesisAtropos,
-		hash.Event{},
-		hash.Events{genesisAtropos},
-	)
-
-	block.Root = state.Root
-	s.SetBlock(block)
-	s.SetBlockIndex(genesisAtropos, block.Index)
-	s.SetEpochStats(0, &sfctype.EpochStats{
-		Start:    net.Genesis.Time,
-		End:      net.Genesis.Time,
-		TotalFee: new(big.Int),
-	})
-	s.SetDirtyEpochStats(&sfctype.EpochStats{
-		Start:    net.Genesis.Time,
-		TotalFee: new(big.Int),
-	})
+	block := &inter.Block{
+		Time:    net.Genesis.Time,
+		Atropos: genesisAtropos,
+		Events:  hash.Events{genesisAtropos},
+	}
+	s.SetBlock(0, block)
 
 	return genesisAtropos, genesisState, nil
 }

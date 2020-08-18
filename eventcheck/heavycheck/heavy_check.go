@@ -10,8 +10,8 @@ import (
 
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/epochcheck"
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
+
+	"github.com/Fantom-foundation/go-lachesis/network"
 )
 
 var (
@@ -37,7 +37,7 @@ type DagReader interface {
 
 // Check which require only parents list + current epoch info
 type Checker struct {
-	config   *lachesis.DagConfig
+	config   *network.DagConfig
 	txSigner types.Signer
 	reader   DagReader
 
@@ -56,7 +56,7 @@ type TaskData struct {
 }
 
 // NewDefault uses N-1 threads
-func NewDefault(config *lachesis.DagConfig, reader DagReader, txSigner types.Signer) *Checker {
+func NewDefault(config *network.DagConfig, reader DagReader, txSigner types.Signer) *Checker {
 	threads := runtime.NumCPU()
 	if threads > 1 {
 		threads--
@@ -68,7 +68,7 @@ func NewDefault(config *lachesis.DagConfig, reader DagReader, txSigner types.Sig
 }
 
 // New validator which performs heavy checks, related to signatures validation and Merkle tree validation
-func New(config *lachesis.DagConfig, reader DagReader, txSigner types.Signer, numOfThreads int) *Checker {
+func New(config *network.DagConfig, reader DagReader, txSigner types.Signer, numOfThreads int) *Checker {
 	return &Checker{
 		config:       config,
 		txSigner:     txSigner,

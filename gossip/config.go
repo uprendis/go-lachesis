@@ -5,8 +5,8 @@ import (
 
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
 	"github.com/Fantom-foundation/go-lachesis/gossip/gasprice"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/params"
+	"github.com/Fantom-foundation/go-lachesis/network"
+	"github.com/Fantom-foundation/go-lachesis/network/params"
 )
 
 type (
@@ -19,7 +19,7 @@ type (
 	}
 	// Config for the gossip service.
 	Config struct {
-		Net     lachesis.Config
+		Net     network.Config
 		Emitter EmitterConfig
 		TxPool  evmcore.TxPoolConfig
 		StoreConfig
@@ -53,29 +53,15 @@ type (
 	StoreConfig struct {
 		// Cache size for Events.
 		EventsCacheSize int
-		// Cache size for EventHeaderData (Epoch db).
-		EventsHeadersCacheSize int
 		// Cache size for Block.
 		BlockCacheSize int
 		// Cache size for PackInfos.
 		PackInfosCacheSize int
-		// Cache size for TxPositions.
-		TxPositionsCacheSize int
-		// Cache size for EpochStats.
-		EpochStatsCacheSize int
-
-		// NOTE: fields for config-file back compatibility
-		// Cache size for Receipts.
-		ReceiptsCacheSize int
-		// Cache size for Stakers.
-		StakersCacheSize int
-		// Cache size for Delegations.
-		DelegationsCacheSize int
 	}
 )
 
 // DefaultConfig returns the default configurations for the gossip service.
-func DefaultConfig(network lachesis.Config) Config {
+func DefaultConfig(network network.Config) Config {
 	cfg := Config{
 		Net:         network,
 		Emitter:     DefaultEmitterConfig(),
@@ -97,14 +83,14 @@ func DefaultConfig(network lachesis.Config) Config {
 		},
 	}
 
-	if network.NetworkID == lachesis.FakeNetworkID {
+	if network.NetworkID == network.FakeNetworkID {
 		cfg.Emitter = FakeEmitterConfig()
 		// disable self-fork protection if fakenet 1/1
 		if len(network.Genesis.Alloc.Validators) == 1 {
 			cfg.Emitter.EmitIntervals.SelfForkProtection = 0
 		}
 	}
-	/*if network.NetworkId == lachesis.DevNetworkId { // TODO dev network
+	/*if network.NetworkId == network.DevNetworkId { // TODO dev network
 		cfg.TxPool = evmcore.FakeTxPoolConfig()
 		cfg.Emitter = FakeEmitterConfig()
 	}*/

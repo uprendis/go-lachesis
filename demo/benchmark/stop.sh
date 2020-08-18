@@ -1,10 +1,10 @@
 #!/bin/bash
 
-PROG=lachesis
+PROG=network
 
-# kill all lachesis processes
+# kill all network processes
 pkill "${PROG}"
 
 # remove demo data
-sudo rm -rf /tmp/lachesis-demo-replay/datadir
+sudo rm -rf /tmp/network-demo-replay/datadir
 rm -rf exec*.sh dump.traffic

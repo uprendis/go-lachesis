@@ -6,11 +6,11 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/simulations/adapters"
 
 	"github.com/Fantom-foundation/go-lachesis/gossip"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
+	"github.com/Fantom-foundation/go-lachesis/network"
 )
 
 // NewIntegration creates gossip service for the integration test
-func NewIntegration(ctx *adapters.ServiceContext, network lachesis.Config) *gossip.Service {
+func NewIntegration(ctx *adapters.ServiceContext, network network.Config) *gossip.Service {
 	gossipCfg := gossip.DefaultConfig(network)
 
 	engine, _, gdb := MakeEngine(ctx.Config.DataDir, &gossipCfg)

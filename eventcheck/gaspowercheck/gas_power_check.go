@@ -2,13 +2,13 @@ package gaspowercheck
 
 import (
 	"errors"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis"
 	"math/big"
 	"time"
 
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/epochcheck"
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
+
 )
 
 var (
@@ -92,7 +92,7 @@ func calcValidatorGasPowerPerSec(
 }
 
 // CalcGasPower calculates available gas power for the event, i.e. how many gas its content may consume
-func (v *Checker) CalcGasPower(e *inter.EventHeaderData, selfParent *inter.EventHeaderData) (inter.GasPowerLeft, error) {
+func (v *Checker) CalcGasPower(e *inter.Event, selfParent *inter.Event) (inter.GasPowerLeft, error) {
 	ctx := v.reader.GetValidationContext()
 	// check that all the data is for the same epoch
 	if ctx.Epoch != e.Epoch {
@@ -107,7 +107,7 @@ func (v *Checker) CalcGasPower(e *inter.EventHeaderData, selfParent *inter.Event
 	return res, nil
 }
 
-func calcGasPower(e *inter.EventHeaderData, selfParent *inter.EventHeaderData, ctx *ValidationContext, config *Config) uint64 {
+func calcGasPower(e *inter.Event, selfParent *inter.Event, ctx *ValidationContext, config *Config) uint64 {
 	gasPowerPerSec, maxGasPower, startup := calcValidatorGasPowerPerSec(e.Creator, ctx.Validators, config)
 
 	var prevGasPowerLeft uint64
@@ -144,8 +144,8 @@ func calcGasPower(e *inter.EventHeaderData, selfParent *inter.EventHeaderData, c
 }
 
 // Validate event
-func (v *Checker) Validate(e *inter.Event, selfParent *inter.EventHeaderData) error {
-	gasPowers, err := v.CalcGasPower(&e.EventHeaderData, selfParent)
+func (v *Checker) Validate(e *inter.Event, selfParent *inter.Event) error {
+	gasPowers, err := v.CalcGasPower(&e.Event, selfParent)
 	if err != nil {
 		return err
 	}

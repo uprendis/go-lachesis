@@ -30,11 +30,11 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/gossip/filters"
 	"github.com/Fantom-foundation/go-lachesis/gossip/gasprice"
 	"github.com/Fantom-foundation/go-lachesis/gossip/occuredtxs"
-	"github.com/Fantom-foundation/go-lachesis/hash"
+	
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/params"
+
+	"github.com/Fantom-foundation/go-lachesis/network"
+	"github.com/Fantom-foundation/go-lachesis/network/params"
 	"github.com/Fantom-foundation/go-lachesis/logger"
 )
 
@@ -184,7 +184,7 @@ func (s *Service) GetEngine() Consensus {
 }
 
 // makeCheckers builds event checkers
-func makeCheckers(net *lachesis.Config, heavyCheckReader *HeavyCheckReader, gasPowerCheckReader *GasPowerCheckReader, engine Consensus, store *Store) *eventcheck.Checkers {
+func makeCheckers(net *network.Config, heavyCheckReader *HeavyCheckReader, gasPowerCheckReader *GasPowerCheckReader, engine Consensus, store *Store) *eventcheck.Checkers {
 	// create signatures checker
 	ledgerID := net.EvmChainConfig().ChainID
 	heavyCheck := heavycheck.NewDefault(&net.Dag, heavyCheckReader, types.NewEIP155Signer(ledgerID))
@@ -296,7 +296,7 @@ func (s *Service) Start(srv *p2p.Server) error {
 
 	var genesis common.Hash
 	genesis = s.engine.GetGenesisHash()
-	s.Topic = discv5.Topic("lachesis@" + genesis.Hex())
+	s.Topic = discv5.Topic("network@" + genesis.Hex())
 
 	if srv.DiscV5 != nil {
 		go func(topic discv5.Topic) {

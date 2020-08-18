@@ -4,8 +4,8 @@ import (
 	"errors"
 
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
+
+	"github.com/Fantom-foundation/go-lachesis/network"
 )
 
 var (
@@ -18,18 +18,18 @@ var (
 
 // Checker which require only parents list + current epoch info
 type Checker struct {
-	config *lachesis.DagConfig
+	config *network.DagConfig
 }
 
 // New validator which performs checks, which require known the parents
-func New(config *lachesis.DagConfig) *Checker {
+func New(config *network.DagConfig) *Checker {
 	return &Checker{
 		config: config,
 	}
 }
 
 // Validate event
-func (v *Checker) Validate(e *inter.Event, parents []*inter.EventHeaderData) error {
+func (v *Checker) Validate(e *inter.Event, parents []*inter.Event) error {
 	if len(e.Parents) != len(parents) {
 		panic("parentscheck: expected event's parents as an argument")
 	}

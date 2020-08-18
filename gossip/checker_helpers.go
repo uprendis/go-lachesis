@@ -1,15 +1,15 @@
 package gossip
 
 import (
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/Fantom-foundation/go-lachesis/app"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/gaspowercheck"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
+
+	"github.com/Fantom-foundation/go-lachesis/network"
 )
 
 // GasPowerCheckReader is a helper to run gas power check
@@ -38,7 +38,7 @@ func gasPowerBounds(initialAlloc, minAlloc, maxAlloc, customAlloc uint64) uint64
 }
 
 // ReadGasPowerContext reads current validation context for gaspowercheck
-func ReadGasPowerContext(s *Store, a *app.Store, validators *genesis.Validators, epoch idx.Epoch, cfg *lachesis.EconomyConfig) *gaspowercheck.ValidationContext {
+func ReadGasPowerContext(s *Store, a *app.Store, validators *genesis.Validators, epoch idx.Epoch, cfg *network.EconomyConfig) *gaspowercheck.ValidationContext {
 	// engineMu is locked here
 	sfcConstants := a.GetSfcConstants(epoch - 1)
 

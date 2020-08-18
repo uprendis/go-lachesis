@@ -2,6 +2,12 @@ package gossip
 
 import (
 	"fmt"
+	"github.com/Fantom-foundation/lachesis-base/gossip/fetcher"
+	"github.com/Fantom-foundation/lachesis-base/gossip/ordering"
+	"github.com/Fantom-foundation/lachesis-base/gossip/packsdownloader"
+	"github.com/Fantom-foundation/lachesis-base/hash"
+	"github.com/Fantom-foundation/lachesis-base/inter/dag"
+	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -16,13 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/Fantom-foundation/go-lachesis/eventcheck"
-	"github.com/Fantom-foundation/go-lachesis/evmcore"
-	"github.com/Fantom-foundation/go-lachesis/gossip/fetcher"
-	"github.com/Fantom-foundation/go-lachesis/gossip/ordering"
-	"github.com/Fantom-foundation/go-lachesis/gossip/packsdownloader"
-	"github.com/Fantom-foundation/go-lachesis/hash"
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/logger"
 )
 
@@ -64,15 +64,11 @@ type ProtocolManager struct {
 
 	synced uint32 // Flag whether we're considered synchronised (enables transaction processing, events broadcasting)
 
-	txpool   txPool
 	maxPeers int
 
 	peers *peerSet
 
 	serverPool *serverPool
-
-	txsCh  chan evmcore.NewTxsNotify
-	txsSub notify.Subscription
 
 	downloader *packsdownloader.PacksDownloader
 	fetcher    *fetcher.Fetcher
@@ -109,7 +105,6 @@ type ProtocolManager struct {
 func NewProtocolManager(
 	config *Config,
 	notifier dagNotifier,
-	txpool txPool,
 	engineMu *sync.RWMutex,
 	checkers *eventcheck.Checkers,
 	s *Store,
@@ -123,7 +118,6 @@ func NewProtocolManager(
 	pm := &ProtocolManager{
 		config:      config,
 		notifier:    notifier,
-		txpool:      txpool,
 		store:       s,
 		engine:      engine,
 		peers:       newPeerSet(),
@@ -140,14 +134,23 @@ func NewProtocolManager(
 	pm.SetName("PM")
 
 	pm.fetcher, pm.buffer = pm.makeFetcher(checkers)
-	pm.downloader = packsdownloader.New(pm.fetcher, pm.onlyNotConnectedEvents, pm.removePeer)
+	pm.downloader = packsdownloader.New(pm.fetcher, pm.onlyNotConnectedEvents, pm.peerMisbehaviour, packsdownloader.DefaultConfig())
 
 	return pm, nil
 }
 
+func (pm *ProtocolManager) peerMisbehaviour(peer string, err error) bool {
+	if eventcheck.IsBan(err) {
+		log.Warn("Dropping peer due to a misbehaviour", "peer", peer, "err", err)
+		pm.removePeer(peer)
+		return true
+	}
+	return false
+}
+
 func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.Fetcher, *ordering.EventBuffer) {
 	// checkers
-	firstCheck := func(e *inter.Event) error {
+	lightCheck := func(e *inter.Event) error {
 		if err := checkers.Basiccheck.Validate(e); err != nil {
 			return err
 		}
@@ -156,8 +159,8 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 		}
 		return nil
 	}
-	bufferedCheck := func(e *inter.Event, parents []*inter.EventHeaderData) error {
-		var selfParent *inter.EventHeaderData
+	bufferedCheck := func(e dag.Event, parents []dag.Event) error {
+		var selfParent dag.Event
 		if e.SelfParent() != nil {
 			selfParent = parents[0]
 		}
@@ -173,7 +176,8 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 	// DAG callbacks
 	buffer := ordering.New(eventsBuffSize, ordering.Callback{
 
-		Process: func(e *inter.Event) error {
+		Process: func(de dag.Event) error {
+			e := de.(*inter.Event)
 			now := time.Now()
 			pm.engineMu.Lock()
 			defer pm.engineMu.Unlock()
@@ -183,41 +187,41 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 			if err != nil {
 				return err
 			}
-			log.Info("New event", "id", e.Hash(), "parents", len(e.Parents), "by", e.Creator, "frame", inter.FmtFrame(e.Frame, e.IsRoot), "txs", e.Transactions.Len(), "t", time.Since(start))
+			log.Info("New event", "id", e.ID(), "parents", len(e.Parents()), "by", e.Creator, "frame", inter.FmtFrame(e.Frame(), e.IsRoot()), "payload", len(e.Payload()), "t", time.Since(start))
 
 			// If the event is indeed in our own graph, announce it
 			if atomic.LoadUint32(&pm.synced) != 0 { // announce only if synced up
-				passedSinceEvent := now.Sub(e.ClaimedTime.Time())
+				passedSinceEvent := now.Sub(e.CreationTime().Time())
 				pm.BroadcastEvent(e, passedSinceEvent)
 			}
 
 			return nil
 		},
 
-		Drop: func(e *inter.Event, peer string, err error) {
+		Drop: func(e dag.Event, peer string, err error) {
 			if eventcheck.IsBan(err) {
-				log.Warn("Incoming event rejected", "event", e.Hash().String(), "creator", e.Creator, "err", err)
+				log.Warn("Incoming event rejected", "event", e.ID().String(), "creator", e.Creator, "err", err)
 				pm.removePeer(peer)
 			}
 		},
 
 		Exists: func(id hash.Event) bool {
-			return pm.store.HasEventHeader(id)
+			return pm.store.HasEvent(id)
 		},
 
-		Get: func(id hash.Event) *inter.EventHeaderData {
-			return pm.store.GetEventHeader(id.Epoch(), id)
+		Get: func(id hash.Event) dag.Event {
+			return pm.store.GetEvent(id)
 		},
 
 		Check: bufferedCheck,
 	})
 
 	newFetcher := fetcher.New(fetcher.Callback{
-		PushEvent:      buffer.PushEvent,
-		OnlyInterested: pm.onlyInterestedEvents,
-		DropPeer:       pm.removePeer,
-		FirstCheck:     firstCheck,
-		HeavyCheck:     checkers.Heavycheck,
+		PushEvent:        buffer.PushEvent,
+		OnlyInterested:   pm.onlyInterestedEvents,
+		PeerMisbehaviour: pm.peerMisbehaviour,
+		LightCheck:       lightCheck,
+		HeavyCheck:       checkers.Heavycheck,
 	})
 	return newFetcher, buffer
 }
@@ -229,7 +233,7 @@ func (pm *ProtocolManager) onlyNotConnectedEvents(ids hash.Events) hash.Events {
 
 	notConnected := make(hash.Events, 0, len(ids))
 	for _, id := range ids {
-		if pm.store.HasEventHeader(id) {
+		if pm.store.HasEvent(id) {
 			continue
 		}
 		notConnected.Add(id)
@@ -248,7 +252,7 @@ func (pm *ProtocolManager) onlyInterestedEvents(ids hash.Events) hash.Events {
 		if id.Epoch() != epoch {
 			continue
 		}
-		if pm.buffer.IsBuffered(id) || pm.store.HasEventHeader(id) {
+		if pm.buffer.IsBuffered(id) || pm.store.HasEvent(id) {
 			continue
 		}
 		interested.Add(id)
@@ -323,13 +327,6 @@ func (pm *ProtocolManager) removePeer(id string) {
 func (pm *ProtocolManager) Start(maxPeers int) {
 	pm.maxPeers = maxPeers
 
-	// broadcast transactions
-	pm.txsCh = make(chan evmcore.NewTxsNotify, txChanSize)
-	pm.txsSub = pm.txpool.SubscribeNewTxsNotify(pm.txsCh)
-
-	pm.loopsWg.Add(1)
-	go pm.txBroadcastLoop()
-
 	if pm.notifier != nil {
 		// broadcast mined events
 		pm.emittedEventsCh = make(chan *inter.Event, 4)
@@ -359,7 +356,6 @@ func (pm *ProtocolManager) Stop() {
 	pm.downloader.Terminate()
 	pm.fetcher.Stop()
 
-	pm.txsSub.Unsubscribe() // quits txBroadcastLoop
 	if pm.notifier != nil {
 		pm.emittedEventsSub.Unsubscribe() // quits eventBroadcastLoop
 		pm.newPacksSub.Unsubscribe()      // quits progressBroadcastLoop
@@ -470,7 +466,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 
 	// Handle the message depending on its contents
 	switch {
-	case msg.Code == EthStatusMsg:
+	case msg.Code == StatusMsg:
 		// Status messages should never arrive after the handshake
 		return errResp(ErrExtraStatusMsg, "uncontrolled status message")
 
@@ -535,25 +531,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			p.MarkEvent(e.Hash())
 		}
 		_ = pm.fetcher.Enqueue(p.id, events, time.Now(), p.RequestEvents)
-
-	case msg.Code == EvmTxMsg:
-		// Transactions arrived, make sure we have a valid and fresh graph to handle them
-		if atomic.LoadUint32(&pm.synced) == 0 {
-			break
-		}
-		// Transactions can be processed, parse all of them and deliver to the pool
-		var txs []*types.Transaction
-		if err := msg.Decode(&txs); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		for i, tx := range txs {
-			// Validate and mark the remote transaction
-			if tx == nil {
-				return errResp(ErrDecode, "transaction %d is nil", i)
-			}
-			p.MarkTransaction(tx.Hash())
-		}
-		pm.txpool.AddRemotes(txs)
 
 	case msg.Code == GetEventsMsg:
 		var requests hash.Events
@@ -859,20 +836,6 @@ func (pm *ProtocolManager) onNewEpochLoop() {
 			pm.downloader.OnNewEpoch(myEpoch, peerEpoch)
 		// Err() channel will be closed when unsubscribing.
 		case <-pm.newEpochsSub.Err():
-			return
-		}
-	}
-}
-
-func (pm *ProtocolManager) txBroadcastLoop() {
-	defer pm.loopsWg.Done()
-	for {
-		select {
-		case notify := <-pm.txsCh:
-			pm.BroadcastTxs(notify.Txs)
-
-		// Err() channel will be closed when unsubscribing.
-		case <-pm.txsSub.Err():
 			return
 		}
 	}

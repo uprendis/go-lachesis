@@ -8,12 +8,12 @@ import (
 
 // KvdbIDStore stores id
 type KvdbIDStore struct {
-	table kvdb.KeyValueStore
+	table kvdb.Store
 	key   []byte
 }
 
 // NewKvdbIDStore constructor
-func NewKvdbIDStore(table kvdb.KeyValueStore) *KvdbIDStore {
+func NewKvdbIDStore(table kvdb.Store) *KvdbIDStore {
 	return &KvdbIDStore{
 		table: table,
 		key:   []byte("id"),

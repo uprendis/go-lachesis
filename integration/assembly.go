@@ -2,30 +2,40 @@ package integration
 
 import (
 	"crypto/ecdsa"
+	"fmt"
+	"github.com/Fantom-foundation/lachesis-base/hash"
+	"github.com/Fantom-foundation/lachesis-base/inter/idx"
+	"github.com/Fantom-foundation/lachesis-base/kvdb"
+	"github.com/Fantom-foundation/lachesis-base/vector"
 
+	"github.com/Fantom-foundation/lachesis-base/abft"
+	"github.com/Fantom-foundation/lachesis-base/kvdb/flushable"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/Fantom-foundation/lachesis-base/kvdb/flushable"
-	"github.com/Fantom-foundation/lachesis-base/kvdb/abft"
-
 	"github.com/Fantom-foundation/go-lachesis/gossip"
 )
 
+func panics(name string) func(error) {
+	return func(err error) {
+		log.Crit(fmt.Sprintf("%s error", name), "err", err)
+	}
+}
+
 // MakeEngine makes consensus engine from config.
-func MakeEngine(dataDir string, gossipCfg *gossip.Config) (*poset.Poset, *flushable.SyncedPool, *gossip.Store) {
+func MakeEngine(dataDir string, gossipCfg *gossip.Config) (*abft.Lachesis, *flushable.SyncedPool, *gossip.Store) {
 	dbs := flushable.NewSyncedPool(DBProducer(dataDir))
 
-	appStoreConfig := app.StoreConfig{
-		ReceiptsCacheSize:    gossipCfg.ReceiptsCacheSize,
-		DelegationsCacheSize: gossipCfg.DelegationsCacheSize,
-		StakersCacheSize:     gossipCfg.StakersCacheSize,
+	gdb := gossip.NewStore(dbs, gossipCfg.StoreConfig)
+
+	cMainDb := dbs.GetDb("network")
+	cGetEpochDB := func(epoch idx.Epoch) kvdb.DropableStore {
+		return dbs.GetDb(fmt.Sprintf("network-%d", epoch))
 	}
-	gdb := gossip.NewStore(dbs, gossipCfg.StoreConfig, appStoreConfig)
-	cdb := poset.NewStore(dbs, poset.DefaultStoreConfig())
+	cdb := abft.NewStore(cMainDb, cGetEpochDB, panics("Lachesis store"), abft.DefaultStoreConfig())
 
 	// write genesis
 
@@ -33,14 +43,19 @@ func MakeEngine(dataDir string, gossipCfg *gossip.Config) (*poset.Poset, *flusha
 	if err != nil {
 		utils.Fatalf("Failed to migrate Gossip DB: %v", err)
 	}
-	genesisAtropos, genesisState, isNew, err := gdb.ApplyGenesis(&gossipCfg.Net)
+	genesisAtropos, _, isNew, err := gdb.ApplyGenesis(&gossipCfg.Net)
 	if err != nil {
 		utils.Fatalf("Failed to write Gossip genesis state: %v", err)
 	}
 
-	err = cdb.ApplyGenesis(&gossipCfg.Net.Genesis, genesisAtropos, genesisState)
-	if err != nil {
-		utils.Fatalf("Failed to write Poset genesis state: %v", err)
+	if isNew {
+		err = cdb.ApplyGenesis(&abft.Genesis{
+			Validators: nil,
+			Atropos:    genesisAtropos,
+		})
+		if err != nil {
+			utils.Fatalf("Failed to write Lachesis genesis state: %v", err)
+		}
 	}
 
 	err = dbs.Flush(genesisAtropos.Bytes())
@@ -49,13 +64,14 @@ func MakeEngine(dataDir string, gossipCfg *gossip.Config) (*poset.Poset, *flusha
 	}
 
 	if isNew {
-		log.Info("Applied genesis state", "hash", cdb.GetGenesisHash().String())
+		log.Info("Applied genesis state", "hash", genesisAtropos.FullID())
 	} else {
-		log.Info("Genesis state is already written", "hash", cdb.GetGenesisHash().String())
+		log.Info("Genesis state is already written", "hash", genesisAtropos.FullID())
 	}
 
 	// create consensus
-	engine := poset.New(gossipCfg.Net.Dag, cdb, gdb)
+	vecClock := vector.NewIndex(panics("Vector clock"), vector.DefaultConfig())
+	engine := abft.New(cdb, gdb, vecClock, panics("Lachesis"), abft.DefaultConfig())
 
 	return engine, dbs, gdb
 }

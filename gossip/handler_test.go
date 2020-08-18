@@ -13,12 +13,12 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Fantom-foundation/go-lachesis/eventcheck"
-	"github.com/Fantom-foundation/go-lachesis/hash"
+	
 	"github.com/Fantom-foundation/go-lachesis/inter"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
+
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
+	"github.com/Fantom-foundation/go-lachesis/network"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis"
 	"github.com/Fantom-foundation/go-lachesis/logger"
 	"github.com/Fantom-foundation/go-lachesis/poset"
 )
@@ -125,7 +125,7 @@ func TestBroadcastEvent(t *testing.T) {
 func testBroadcastEvent(t *testing.T, totalPeers int, forcedAggressiveBroadcast bool) {
 	assertar := assert.New(t)
 
-	net := lachesis.FakeNetConfig(genesis.FakeValidators(1, big.NewInt(0), pos.StakeToBalance(1)))
+	net := network.FakeNetConfig(genesis.FakeValidators(1, big.NewInt(0), pos.StakeToBalance(1)))
 	config := DefaultConfig(net)
 	if forcedAggressiveBroadcast {
 		config.Protocol.LatencyImportance = 1
@@ -262,7 +262,7 @@ func mockAccountManager(accs genesis.Accounts, unlock ...common.Address) *accoun
 	)
 }
 
-func mockCheckers(epoch idx.Epoch, net *lachesis.Config, engine Consensus, s *Store) *eventcheck.Checkers {
+func mockCheckers(epoch idx.Epoch, net *network.Config, engine Consensus, s *Store) *eventcheck.Checkers {
 	heavyCheckReader := &HeavyCheckReader{}
 	heavyCheckReader.Addrs.Store(ReadEpochPubKeys(s.app, epoch))
 	gasPowerCheckReader := &GasPowerCheckReader{}

@@ -2,7 +2,7 @@ package gossip
 
 import (
 	"fmt"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/genesis"
+	"github.com/Fantom-foundation/go-lachesis/network/genesis"
 	"math/rand"
 	"strings"
 	"sync"
@@ -21,13 +21,13 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
 	"github.com/Fantom-foundation/go-lachesis/gossip/occuredtxs"
 	"github.com/Fantom-foundation/go-lachesis/gossip/piecefunc"
-	"github.com/Fantom-foundation/go-lachesis/hash"
+	
 	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/ancestor"
-	"github.com/Fantom-foundation/go-lachesis/inter/idx"
+
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
-	"github.com/Fantom-foundation/go-lachesis/lachesis"
-	"github.com/Fantom-foundation/go-lachesis/lachesis/params"
+	"github.com/Fantom-foundation/go-lachesis/network"
+	"github.com/Fantom-foundation/go-lachesis/network/params"
 	"github.com/Fantom-foundation/go-lachesis/logger"
 	"github.com/Fantom-foundation/go-lachesis/tracing"
 	"github.com/Fantom-foundation/go-lachesis/utils"
@@ -63,7 +63,7 @@ type EmitterWorld struct {
 type Emitter struct {
 	txTime *lru.Cache // tx hash -> tx time
 
-	net    *lachesis.Config
+	net    *network.Config
 	config *EmitterConfig
 
 	world EmitterWorld
@@ -95,7 +95,7 @@ type selfForkProtection struct {
 
 // NewEmitter creation.
 func NewEmitter(
-	net *lachesis.Config,
+	net *network.Config,
 	config *EmitterConfig,
 	world EmitterWorld,
 ) *Emitter {
@@ -198,7 +198,7 @@ func (em *Emitter) loadPrevEmitTime() time.Time {
 	if prevEventID == nil {
 		return em.prevEmittedTime
 	}
-	prevEvent := em.world.Store.GetEventHeader(prevEventID.Epoch(), *prevEventID)
+	prevEvent := em.world.Store.GetEvent(prevEventID.Epoch(), *prevEventID)
 	if prevEvent == nil {
 		return em.prevEmittedTime
 	}
@@ -236,7 +236,7 @@ func (em *Emitter) findMyStakerID() (idx.StakerID, bool) {
 
 // safe for concurrent use
 func (em *Emitter) isMyTxTurn(txHash common.Hash, sender common.Address, accountNonce uint64, now time.Time, validatorsArr []idx.StakerID, validatorsArrStakes []pos.Stake, me idx.StakerID) bool {
-	turnHash := hash.Of(sender.Bytes(), bigendian.Int64ToBytes(accountNonce/TxTurnNonces), em.world.Engine.GetEpoch().Bytes())
+	turnHash := hash.Of(sender.Bytes(), bigendian.Uint64ToBytes(accountNonce/TxTurnNonces), em.world.Engine.GetEpoch().Bytes())
 
 	var txTime time.Time
 	txTimeI, ok := em.txTime.Get(txHash)
@@ -358,9 +358,9 @@ func (em *Emitter) createEvent(poolTxs map[common.Address]types.Transactions) *i
 	}
 
 	// Set parent-dependent fields
-	parentHeaders := make([]*inter.EventHeaderData, len(parents))
+	parentHeaders := make([]*inter.Event, len(parents))
 	for i, p := range parents {
-		parent := em.world.Store.GetEventHeader(epoch, p)
+		parent := em.world.Store.GetEvent(epoch, p)
 		if parent == nil {
 			em.Log.Crit("Emitter: head not found", "event", p.String())
 		}
@@ -375,7 +375,7 @@ func (em *Emitter) createEvent(poolTxs map[common.Address]types.Transactions) *i
 
 	selfParentSeq = 0
 	selfParentTime = 0
-	var selfParentHeader *inter.EventHeaderData
+	var selfParentHeader *inter.Event
 	if selfParent != nil {
 		selfParentHeader = parentHeaders[0]
 		selfParentSeq = selfParentHeader.Seq
@@ -406,7 +406,7 @@ func (em *Emitter) createEvent(poolTxs map[common.Address]types.Transactions) *i
 	// calc initial GasPower
 	validators := em.world.Engine.GetValidators()
 	event.GasPowerUsed = basiccheck.CalcGasPowerUsed(event, &em.net.Dag)
-	availableGasPower, err := em.world.Checkers.Gaspowercheck.CalcGasPower(&event.EventHeaderData, selfParentHeader)
+	availableGasPower, err := em.world.Checkers.Gaspowercheck.CalcGasPower(&event.Event, selfParentHeader)
 	if err != nil {
 		em.Log.Warn("Gas power calculation failed", "err", err)
 		return nil
@@ -651,7 +651,7 @@ func (em *Emitter) maxGasPowerToUse(e *inter.Event) uint64 {
 	return params.MaxGasPowerUsed
 }
 
-func (em *Emitter) isAllowedToEmit(e *inter.Event, selfParent *inter.EventHeaderData) bool {
+func (em *Emitter) isAllowedToEmit(e *inter.Event, selfParent *inter.Event) bool {
 	passedTime := e.ClaimedTime.Time().Sub(em.prevEmittedTime)
 	// Slow down emitting if power is low
 	{

@@ -12,7 +12,7 @@ do
 
   docker $SWARM service update ${NAME} \
     --stop-grace-period 10s \
-    --image ${REGISTRY_HOST}/lachesis:${TAG} \
+    --image ${REGISTRY_HOST}/network:${TAG} \
     --with-registry-auth \
     --detach=false
 

@@ -19,7 +19,7 @@ type Checkers struct {
 }
 
 // Validate runs all the checks except Poset-related
-func (v *Checkers) Validate(e *inter.Event, parents []*inter.EventHeaderData) error {
+func (v *Checkers) Validate(e *inter.Event, parents []*inter.Event) error {
 	if err := v.Basiccheck.Validate(e); err != nil {
 		return err
 	}
@@ -29,7 +29,7 @@ func (v *Checkers) Validate(e *inter.Event, parents []*inter.EventHeaderData) er
 	if err := v.Parentscheck.Validate(e, parents); err != nil {
 		return err
 	}
-	var selfParent *inter.EventHeaderData
+	var selfParent *inter.Event
 	if e.SelfParent() != nil {
 		selfParent = parents[0]
 	}

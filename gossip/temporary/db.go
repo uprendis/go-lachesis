@@ -1,17 +1,17 @@
 package temporary
 
 import (
+	"github.com/Fantom-foundation/lachesis-base/common/bigendian"
+	"github.com/Fantom-foundation/lachesis-base/kvdb"
 	"sync"
 
-	"github.com/Fantom-foundation/go-lachesis/common/bigendian"
-	"github.com/Fantom-foundation/go-lachesis/kvdb"
 	"github.com/Fantom-foundation/go-lachesis/logger"
 )
 
 type (
 	// Dbs is a named sequence of temporary databases and related object (tables).
 	Dbs struct {
-		store kvdb.KeyValueStore
+		store kvdb.Store
 		seq   ringbuf
 		maker DbMaker
 
@@ -20,17 +20,17 @@ type (
 	}
 
 	// DbMaker makes temporary database and related object (tables).
-	DbMaker func(ver uint64) (db kvdb.KeyValueStore, tables interface{})
+	DbMaker func(ver uint64) (db kvdb.DropableStore, tables interface{})
 
 	// db is a pair of temporary database and related object (tables).
 	pair struct {
-		Db     kvdb.KeyValueStore
+		Db     kvdb.DropableStore
 		Tables interface{}
 	}
 )
 
 // NewDbs constructor.
-func NewDbs(table kvdb.KeyValueStore, maker DbMaker) *Dbs {
+func NewDbs(table kvdb.Store, maker DbMaker) *Dbs {
 	dbs := &Dbs{
 		store:    table,
 		maker:    maker,
@@ -94,13 +94,13 @@ func (t *Dbs) loadMin() {
 		return
 	}
 
-	t.seq.Min = bigendian.BytesToInt64(buf)
+	t.seq.Min = bigendian.BytesToUint64(buf)
 }
 
 func (t *Dbs) saveMin() {
 	key := []byte("m")
 
-	err := t.store.Put(key, bigendian.Int64ToBytes(t.seq.Min))
+	err := t.store.Put(key, bigendian.Uint64ToBytes(t.seq.Min))
 	if err != nil {
 		t.Log.Crit("Failed to put key-value", "err", err)
 	}

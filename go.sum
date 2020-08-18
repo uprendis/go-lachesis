@@ -314,6 +314,12 @@ github.com/uber/jaeger-client-go v2.20.1+incompatible h1:HgqpYBng0n7tLJIlyT4kPCI
 github.com/uber/jaeger-client-go v2.20.1+incompatible/go.mod h1:WVhlPFC8FDjOFMMWRy2pZqQJSXxYSwNYOkTr/Z6d3Kk=
 github.com/uber/jaeger-lib v2.2.0+incompatible h1:MxZXOiR2JuoANZ3J6DE/U0kSFv/eJ/GfSYVCjK7dyaw=
 github.com/uber/jaeger-lib v2.2.0+incompatible/go.mod h1:ComeNDZlWwrWnDv8aPp0Ba6+uUTzImX/AauajbLI56U=
+github.com/uprendis/lachesis-base v0.0.0-20200818030045-bc8b05d59dd1 h1:6EE6Za0HFni9xrdKdA7DUHl27mZQRhisGiM0Ico6uqU=
+github.com/uprendis/lachesis-base v0.0.0-20200818030045-bc8b05d59dd1/go.mod h1:JyoGnkqzSRYBRPzVybDAP6MlB027ZNy8p87YQoE9dKQ=
+github.com/uprendis/lachesis-base v0.0.0-20200818032021-e9d2bca2dfb6 h1:S10uH8kp9pafjNkBAP/bR9TwfNwWVVJ6m+eef5C5wT8=
+github.com/uprendis/lachesis-base v0.0.0-20200818032021-e9d2bca2dfb6/go.mod h1:JyoGnkqzSRYBRPzVybDAP6MlB027ZNy8p87YQoE9dKQ=
+github.com/uprendis/lachesis-base v0.0.0-20200818063954-71d11a1d3754 h1:TP1D69I5IgVNGg86Ao4PyO4wtvKZUV0lRRx5eI3fIko=
+github.com/uprendis/lachesis-base v0.0.0-20200818063954-71d11a1d3754/go.mod h1:JyoGnkqzSRYBRPzVybDAP6MlB027ZNy8p87YQoE9dKQ=
 github.com/urfave/cli v1.20.0 h1:fDqGv3UG/4jbVl/QkFwEdddtEDjh/5Ov6X+0B/3bPaw=
 github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
