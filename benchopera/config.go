@@ -1,11 +1,8 @@
 package benchopera
 
 import (
-	"github.com/Fantom-foundation/lachesis-base/inter/idx"
-	ethparams "github.com/ethereum/go-ethereum/params"
-	"math/big"
-
 	"github.com/Fantom-foundation/go-lachesis/benchopera/genesis"
+	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 )
 
 const (
@@ -42,9 +39,9 @@ func FakeNetConfig(accs genesis.Validators) Config {
 
 func DefaultDagConfig() DagConfig {
 	return DagConfig{
-		MaxParents:                10,
-		MaxFreeParents:            3,
-		MaxEpochBlocks:            1000,
+		MaxParents:     10,
+		MaxFreeParents: 3,
+		MaxEpochBlocks: 1000,
 	}
 }
 

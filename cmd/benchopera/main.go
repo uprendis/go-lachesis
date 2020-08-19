@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/console"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -18,9 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"gopkg.in/urfave/cli.v1"
 
-	"github.com/Fantom-foundation/go-lachesis/cmd/lachesis/metrics"
-	"github.com/Fantom-foundation/go-lachesis/cmd/lachesis/tracing"
-	"github.com/Fantom-foundation/go-lachesis/debug"
+	"github.com/Fantom-foundation/go-lachesis/cmd/benchopera/metrics"
 	"github.com/Fantom-foundation/go-lachesis/gossip"
 	"github.com/Fantom-foundation/go-lachesis/integration"
 	"github.com/Fantom-foundation/go-lachesis/utils/errlock"
@@ -58,34 +54,11 @@ func init() {
 	// Flags that configure the node.
 	nodeFlags = []cli.Flag{
 		utils.IdentityFlag,
-		utils.UnlockedAccountFlag,
-		utils.PasswordFileFlag,
 		utils.BootnodesFlag,
 		utils.BootnodesV4Flag,
 		utils.BootnodesV5Flag,
 		DataDirFlag,
-		utils.KeyStoreDirFlag,
-		utils.ExternalSignerFlag,
 		utils.NoUSBFlag,
-		utils.SmartCardDaemonPathFlag,
-		utils.TxPoolLocalsFlag,
-		utils.TxPoolNoLocalsFlag,
-		utils.TxPoolJournalFlag,
-		utils.TxPoolRejournalFlag,
-		utils.TxPoolPriceLimitFlag,
-		utils.TxPoolPriceBumpFlag,
-		utils.TxPoolAccountSlotsFlag,
-		utils.TxPoolGlobalSlotsFlag,
-		utils.TxPoolAccountQueueFlag,
-		utils.TxPoolGlobalQueueFlag,
-		utils.TxPoolLifetimeFlag,
-		utils.ExitWhenSyncedFlag,
-		utils.CacheFlag,
-		utils.CacheDatabaseFlag,
-		utils.CacheTrieFlag,
-		utils.CacheGCFlag,
-		utils.CacheNoPrefetchFlag,
-		utils.ListenPortFlag,
 		utils.MaxPeersFlag,
 		utils.MaxPendingPeersFlag,
 		utils.NATFlag,
@@ -94,16 +67,7 @@ func init() {
 		utils.NetrestrictFlag,
 		utils.NodeKeyFileFlag,
 		utils.NodeKeyHexFlag,
-		utils.TestnetFlag,
-		utils.VMEnableDebugFlag,
 		utils.NetworkIdFlag,
-		utils.EthStatsURLFlag,
-		utils.NoCompactionFlag,
-		utils.GpoBlocksFlag,
-		utils.GpoPercentileFlag,
-		GpoDefaultFlag,
-		utils.EWASMInterpreterFlag,
-		utils.EVMInterpreterFlag,
 		configFileFlag,
 		validatorFlag,
 	}
@@ -141,7 +105,6 @@ func init() {
 		utils.MetricsInfluxDBPasswordFlag,
 		utils.MetricsInfluxDBTagsFlag,
 		metrics.PrometheusEndpointFlag,
-		tracing.EnableFlag,
 	}
 
 	// App.
@@ -150,9 +113,6 @@ func init() {
 	app.Version = params.VersionWithCommit(gitCommit, gitDate)
 	app.HideVersion = true // we have a command to print the version
 	app.Commands = []cli.Command{
-		// See accountcmd.go:
-		accountCommand,
-		walletCommand,
 		// See consolecmd.go:
 		consoleCommand,
 		attachCommand,
@@ -169,15 +129,9 @@ func init() {
 	app.Flags = append(app.Flags, nodeFlags...)
 	app.Flags = append(app.Flags, rpcFlags...)
 	app.Flags = append(app.Flags, consoleFlags...)
-	app.Flags = append(app.Flags, debug.Flags...)
 	app.Flags = append(app.Flags, metricsFlags...)
 
 	app.Before = func(ctx *cli.Context) error {
-		logdir := ""
-		if err := debug.Setup(ctx, logdir); err != nil {
-			return err
-		}
-
 		// Start metrics export if enabled
 		utils.SetupMetrics(ctx)
 		metrics.SetupPrometheus(ctx)
@@ -186,7 +140,6 @@ func init() {
 	}
 
 	app.After = func(ctx *cli.Context) error {
-		debug.Exit()
 		console.Stdin.Close() // Resets terminal mode.
 
 		return nil
@@ -208,13 +161,6 @@ func lachesisMain(ctx *cli.Context) error {
 		return fmt.Errorf("invalid command: %q", args[0])
 	}
 
-	// TODO: tracing flags
-	tracingStop, err := tracing.Start(ctx)
-	if err != nil {
-		return err
-	}
-	defer tracingStop()
-
 	node := makeNode(ctx, makeAllConfigs(ctx))
 	defer node.Close()
 	startNode(ctx, node)
@@ -233,11 +179,7 @@ func makeNode(ctx *cli.Context, cfg *config) *node.Node {
 	metrics.SetDataDir(cfg.Node.DataDir)
 
 	// configure emitter
-	var ks *keystore.KeyStore
-	if keystores := stack.AccountManager().Backends(keystore.KeyStoreType); len(keystores) > 0 {
-		ks = keystores[0].(*keystore.KeyStore)
-	}
-	setValidator(ctx, ks, &cfg.Lachesis.Emitter)
+	cfg.Lachesis.Emitter = *setValidator(ctx, &cfg.Lachesis.Emitter)
 
 	// Create and register a gossip benchopera service. This is done through the definition
 	// of a node.ServiceConstructor that will instantiate a node.Service. The reason for
@@ -260,21 +202,14 @@ func makeConfigNode(ctx *cli.Context, cfg *node.Config) *node.Node {
 		utils.Fatalf("Failed to create the protocol stack: %v", err)
 	}
 
-	addFakeAccount(ctx, stack)
-
 	return stack
 }
 
 // startNode boots up the system node and all registered protocols, after which
 // it unlocks any requested accounts, and starts the RPC/IPC interfaces.
 func startNode(ctx *cli.Context, stack *node.Node) {
-	debug.Memsize.Add("node", stack)
-
 	// Start up the node itself
 	utils.StartNode(stack)
-
-	// Unlock any account specifically requested
-	unlockAccounts(ctx, stack)
 
 	// Register wallet event handlers to open and auto-derive wallets
 	events := make(chan accounts.WalletEvent, 16)
@@ -286,26 +221,7 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 		utils.Fatalf("Failed to attach to self: %v", err)
 	}
 	ethClient := ethclient.NewClient(rpcClient)
-	/*
-		// Set contract backend for ethereum service if local node
-		// is serving LES requests.
-		if ctx.GlobalInt(utils.LightLegacyServFlag.Name) > 0 || ctx.GlobalInt(utils.LightServeFlag.Name) > 0 {
-			var ethService *eth.Ethereum
-			if err := stack.Service(&ethService); err != nil {
-				utils.Fatalf("Failed to retrieve ethereum service: %v", err)
-			}
-			ethService.SetContractBackend(ethClient)
-		}
-		// Set contract backend for les service if local node is
-		// running as a light client.
-		if ctx.GlobalString(utils.SyncModeFlag.Name) == "light" {
-			var lesService *les.LightEthereum
-			if err := stack.Service(&lesService); err != nil {
-				utils.Fatalf("Failed to retrieve light ethereum service: %v", err)
-			}
-			lesService.SetContractBackend(ethClient)
-		}
-	*/
+
 	go func() {
 		// Open any wallets already attached
 		for _, wallet := range stack.AccountManager().Wallets() {
@@ -365,30 +281,5 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 				}
 			}
 		}()
-	}
-}
-
-// unlockAccounts unlocks any account specifically requested.
-func unlockAccounts(ctx *cli.Context, stack *node.Node) {
-	var unlocks []string
-	inputs := strings.Split(ctx.GlobalString(utils.UnlockedAccountFlag.Name), ",")
-	for _, input := range inputs {
-		if trimmed := strings.TrimSpace(input); trimmed != "" {
-			unlocks = append(unlocks, trimmed)
-		}
-	}
-	// Short circuit if there is no account to unlock.
-	if len(unlocks) == 0 {
-		return
-	}
-	// If insecure account unlocking is not allowed if node's APIs are exposed to external.
-	// Print warning log to user and skip unlocking.
-	if !stack.Config().InsecureUnlockAllowed && stack.Config().ExtRPCEnabled() {
-		utils.Fatalf("Account unlock with HTTP access is forbidden!")
-	}
-	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
-	passwords := utils.MakePasswordList(ctx)
-	for i, account := range unlocks {
-		unlockAccount(ks, account, i, passwords)
 	}
 }

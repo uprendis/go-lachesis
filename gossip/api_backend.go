@@ -1,13 +1,6 @@
 package gossip
 
-import (
-	"errors"
-)
-
-var ErrNotImplemented = func(name string) error { return errors.New(name + " method is not implemented yet") }
-
-// APIBackend implements ethapi.Backend.
+// APIBackend implements api.Backend.
 type APIBackend struct {
-	extRPCEnabled bool
-	svc           *Service
+	svc *Service
 }

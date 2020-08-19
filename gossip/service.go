@@ -1,7 +1,9 @@
 package gossip
 
 import (
+	"crypto/ecdsa"
 	"fmt"
+	"github.com/Fantom-foundation/go-lachesis/benchopera/genesis"
 	"github.com/Fantom-foundation/go-lachesis/gossip/emitter"
 	"github.com/Fantom-foundation/lachesis-base/eventcheck/epochcheck"
 	"github.com/Fantom-foundation/lachesis-base/inter/dag"
@@ -13,8 +15,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	notify "github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/node"
@@ -23,13 +23,11 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/Fantom-foundation/go-lachesis/ethapi"
+	"github.com/Fantom-foundation/go-lachesis/api"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/basiccheck"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/heavycheck"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/parentscheck"
-	"github.com/Fantom-foundation/go-lachesis/evmcore"
-	"github.com/Fantom-foundation/go-lachesis/gossip/filters"
 	"github.com/Fantom-foundation/go-lachesis/inter"
 
 	"github.com/Fantom-foundation/go-lachesis/benchopera"
@@ -95,7 +93,7 @@ type Service struct {
 	pm *ProtocolManager
 
 	API           *APIBackend
-	netRPCService *ethapi.PublicNetAPI
+	netRPCService *api.PublicNetAPI
 
 	stopped bool
 
@@ -124,7 +122,7 @@ func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine l
 	svc.serverPool = newServerPool(store.async.table.Peers, svc.done, &svc.wg, trustedNodes)
 
 	// create checkers
-	svc.heavyCheckReader.PubKeys.Store(NewEpochPubKeys(svc.store.GetEpoch(), svc.config.Net.Genesis.Validators))                                                                     // read pub keys of current epoch from disk
+	svc.heavyCheckReader.PubKeys.Store(NewEpochPubKeys(svc.store.GetEpoch(), svc.config.Net.Genesis.Validators)) // read pub keys of current epoch from disk
 	svc.checkers = makeCheckers(&svc.config.Net, &svc.heavyCheckReader, svc.store)
 
 	// create protocol manager
@@ -132,7 +130,7 @@ func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine l
 	svc.pm, err = NewProtocolManager(config, &svc.feed, svc.engineMu, svc.checkers, store, svc.processEvent, svc.serverPool)
 
 	// create API backend
-	svc.API = &APIBackend{config.ExtRPCEnabled, svc, stateReader, nil}
+	svc.API = &APIBackend{svc}
 
 	return svc, err
 }
@@ -156,7 +154,7 @@ func (s *Service) makeEmitter() *emitter.Emitter {
 	emitterCfg := s.config.Emitter // copy data
 	emitterCfg.EmitIntervals = *emitterCfg.EmitIntervals.RandomizeEmitTime(r)
 
-	return emitter.NewEmitter(&s.config.Net, nil, &emitterCfg,
+	return emitter.New(&s.config.Net, &emitterCfg,
 		emitter.EmitterWorld{
 			Store:    s.store,
 			EngineMu: s.engineMu,
@@ -200,20 +198,10 @@ func (s *Service) Protocols() []p2p.Protocol {
 
 // APIs returns api methods the service wants to expose on rpc channels.
 func (s *Service) APIs() []rpc.API {
-	apis := ethapi.GetAPIs(s.API)
+	apis := api.GetAPIs(s.API)
 
 	apis = append(apis, []rpc.API{
 		{
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicEthereumAPI(s),
-			Public:    true,
-		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(s.API),
-			Public:    true,
-		}, {
 			Namespace: "net",
 			Version:   "1.0",
 			Service:   s.netRPCService,
@@ -227,10 +215,10 @@ func (s *Service) APIs() []rpc.API {
 // Start method invoked when the node is ready to start the service.
 func (s *Service) Start(srv *p2p.Server) error {
 	// Start the RPC service
-	s.netRPCService = ethapi.NewPublicNetAPI(srv, s.config.Net.NetworkID)
+	s.netRPCService = api.NewPublicNetAPI(srv, s.config.Net.NetworkID)
 
-	genesis := s.store.GetBlock(0).Atropos
-	s.Topic = discv5.Topic("benchopera@" + genesis.Hex())
+	g := s.store.GetBlock(0).Atropos
+	s.Topic = discv5.Topic("benchopera@" + g.Hex())
 
 	if srv.DiscV5 != nil {
 		go func(topic discv5.Topic) {
@@ -245,8 +233,12 @@ func (s *Service) Start(srv *p2p.Server) error {
 
 	s.serverPool.start(srv, s.Topic)
 
+	var key *ecdsa.PrivateKey
+	if s.config.Emitter.Validator != 0 {
+		key = genesis.FakeKey(int(s.config.Emitter.Validator))
+	}
 	s.emitter = s.makeEmitter()
-	s.emitter.StartEventEmission()
+	s.emitter.StartEventEmission(key)
 
 	return nil
 }

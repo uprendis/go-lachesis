@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"crypto/ecdsa"
 	"fmt"
 	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/dag"
@@ -12,10 +11,7 @@ import (
 
 	"github.com/Fantom-foundation/lachesis-base/abft"
 	"github.com/Fantom-foundation/lachesis-base/kvdb/flushable"
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/Fantom-foundation/go-lachesis/gossip"
@@ -60,7 +56,8 @@ func MakeEngine(dataDir string, gossipCfg *gossip.Config) (*abft.Lachesis, *flus
 
 	if isNew {
 		err = cdb.ApplyGenesis(&abft.Genesis{
-			Validators: nil,
+			Epoch:      abft.FirstEpoch,
+			Validators: gossipCfg.Net.Genesis.Validators.Build(),
 			Atropos:    genesisAtropos,
 		})
 		if err != nil {
@@ -84,36 +81,4 @@ func MakeEngine(dataDir string, gossipCfg *gossip.Config) (*abft.Lachesis, *flus
 	engine := abft.NewLachesis(cdb, &GossipStoreAdapter{gdb}, &adapters.VectorToDagIndexer{vecClock}, panics("Lachesis"), abft.DefaultConfig())
 
 	return engine, dbs, gdb
-}
-
-// SetAccountKey sets key into accounts manager and unlocks it with pswd.
-func SetAccountKey(
-	am *accounts.Manager, key *ecdsa.PrivateKey, pswd string,
-) (
-	acc accounts.Account,
-) {
-	kss := am.Backends(keystore.KeyStoreType)
-	if len(kss) < 1 {
-		log.Warn("Keystore is not found")
-		return
-	}
-	ks := kss[0].(*keystore.KeyStore)
-
-	acc = accounts.Account{
-		Address: crypto.PubkeyToAddress(key.PublicKey),
-	}
-
-	imported, err := ks.ImportECDSA(key, pswd)
-	if err == nil {
-		acc = imported
-	} else if err.Error() != "account already exists" {
-		log.Crit("Failed to import key", "err", err)
-	}
-
-	err = ks.Unlock(acc, pswd)
-	if err != nil {
-		log.Crit("failed to unlock key", "err", err)
-	}
-
-	return
 }

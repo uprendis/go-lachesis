@@ -65,10 +65,9 @@ type syncStatus struct {
 	externalSelfEventDetected time.Time
 }
 
-// NewEmitter creation.
-func NewEmitter(
+// New creation.
+func New(
 	net *benchopera.Config,
-	privKey *ecdsa.PrivateKey,
 	config *Config,
 	world EmitterWorld,
 ) *Emitter {
@@ -77,7 +76,6 @@ func NewEmitter(
 	return &Emitter{
 		net:       net,
 		config:    config,
-		privKey:   privKey,
 		world:     world,
 		intervals: config.EmitIntervals,
 		Periodic:  logger.Periodic{Instance: loggerInstance},
@@ -93,12 +91,13 @@ func (em *Emitter) init() {
 }
 
 // StartEventEmission starts event emission.
-func (em *Emitter) StartEventEmission() {
+func (em *Emitter) StartEventEmission(key *ecdsa.PrivateKey) {
 	if em.done != nil {
 		return
 	}
 	em.done = make(chan struct{})
 
+	em.privKey = key
 	em.init()
 
 	done := em.done

@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"math/big"
 	"net/http"
 	"os"
@@ -16,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/simulations"
 	"github.com/ethereum/go-ethereum/p2p/simulations/adapters"
 
-	"github.com/Fantom-foundation/go-lachesis/inter/pos"
 	"github.com/Fantom-foundation/go-lachesis/benchopera"
 	"github.com/Fantom-foundation/go-lachesis/benchopera/genesis"
 )
@@ -42,12 +42,14 @@ func testSim(t *testing.T, connect topology) {
 		log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
 
 	// fake net
-	network := benchopera.FakeNetConfig(genesis.FakeValidators(count, big.NewInt(0), pos.WeightToBalance(10000)))
+	network := benchopera.FakeNetConfig(genesis.FakeValidators(count, big.NewInt(1000)))
 
 	// register a single gossip service
+	valCount := idx.ValidatorID(0)
 	services := map[string]adapters.ServiceFunc{
 		"gossip": func(ctx *adapters.ServiceContext) (node.Service, error) {
-			g := NewIntegration(ctx, network)
+			valCount++
+			g := NewIntegration(ctx, network, valCount)
 			return g, nil
 		},
 	}
@@ -66,9 +68,8 @@ func testSim(t *testing.T, connect topology) {
 
 	// create and start nodes
 	nodes := make([]enode.ID, count)
-	addrs := network.Genesis.Alloc.Validators.Addresses()
-	for i, addr := range addrs {
-		key := network.Genesis.Alloc.Accounts[addr].PrivateKey
+	for i := range network.Genesis.Validators {
+		key := genesis.FakeKey(i)
 		id := enode.PubkeyToIDV4(&key.PublicKey)
 		config := &adapters.NodeConfig{
 			ID:         id,

@@ -21,9 +21,9 @@ type (
 
 // Build converts Validators to Validators
 func (gv Validators) Build() *pos.Validators {
-	builder := pos.NewBuilder()
+	builder := pos.NewBigBuilder()
 	for _, validator := range gv {
-		builder.Set(validator.ID, pos.Weight(validator.Stake.Uint64()))
+		builder.Set(validator.ID, validator.Stake)
 	}
 	return builder.Build()
 }

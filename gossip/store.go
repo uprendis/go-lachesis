@@ -32,7 +32,7 @@ type Store struct {
 
 		// Main DAG tables
 		BlockState kvdb.Store `table:"d"`
-		EpochState kvdb.Store `table:"d"`
+		EpochState kvdb.Store `table:"D"`
 		Events     kvdb.Store `table:"e"`
 		Blocks     kvdb.Store `table:"b"`
 		PackInfos  kvdb.Store `table:"p"`

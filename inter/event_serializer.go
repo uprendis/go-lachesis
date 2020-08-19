@@ -118,7 +118,8 @@ func (e *Event) MarshalBinary() ([]byte, error) {
 	}
 
 	buf.Write(e.Payload())
-	buf.Write(e.Sig().Bytes())
+	sig := e.Sig()
+	buf.Write(sig.Bytes())
 
 	length := header3.Size() + header2.Size() + buf.Position()
 	return raw[:length], nil
