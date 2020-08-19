@@ -22,9 +22,9 @@ const (
 func (s *Service) packsOnNewEvent(e *inter.Event, epoch idx.Epoch) {
 	// due to default values, we don't need to explicitly set values at a start of an epoch
 	packIdx := s.store.GetPacksNumOrDefault(epoch)
-	packInfo := s.store.GetPackInfoOrDefault(s.engine.GetEpoch(), packIdx)
+	packInfo := s.store.GetPackInfoOrDefault(s.store.GetEpoch(), packIdx)
 
-	s.store.AddToPack(epoch, packIdx, e.Hash())
+	s.store.AddToPack(epoch, packIdx, e.ID())
 
 	packInfo.Index = packIdx
 	packInfo.NumOfEvents++
@@ -42,7 +42,7 @@ func (s *Service) packsOnNewEvent(e *inter.Event, epoch idx.Epoch) {
 func (s *Service) packsOnNewEpoch(oldEpoch, newEpoch idx.Epoch) {
 	// pin the last pack
 	packIdx := s.store.GetPacksNumOrDefault(oldEpoch)
-	packInfo := s.store.GetPackInfoOrDefault(s.engine.GetEpoch(), packIdx)
+	packInfo := s.store.GetPackInfoOrDefault(s.engine.ID(), packIdx)
 
 	packInfo.Heads = s.store.GetHeads(oldEpoch)
 	s.store.SetPackInfo(oldEpoch, packIdx, packInfo)

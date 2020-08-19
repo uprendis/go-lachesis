@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	notify "github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -28,12 +27,8 @@ import (
 
 const (
 	softResponseLimitSize = 2 * 1024 * 1024    // Target maximum size of returned events, or other data.
-	softLimitItems        = 250                // Target maximum number of events or transactions to request/response
-	hardLimitItems        = softLimitItems * 4 // Maximum number of events or transactions to request/response
-
-	// txChanSize is the size of channel listening to NewTxsNotify.
-	// The number is referenced from the size of tx pool.
-	txChanSize = 4096
+	softLimitItems        = 250                // Target maximum number of events to request/response
+	hardLimitItems        = softLimitItems * 4 // Maximum number of events to request/response
 
 	// the maximum number of events in the ordering buffer
 	eventsBuffSize = 2048
@@ -62,7 +57,7 @@ type dagNotifier interface {
 type ProtocolManager struct {
 	config *Config
 
-	synced uint32 // Flag whether we're considered synchronised (enables transaction processing, events broadcasting)
+	synced uint32 // Flag whether we're considered synchronised (enables events broadcasting)
 
 	maxPeers int
 
@@ -88,7 +83,6 @@ type ProtocolManager struct {
 
 	// channels for fetcher, syncer, txsyncLoop
 	newPeerCh   chan *peer
-	txsyncCh    chan *txsync
 	quitSync    chan struct{}
 	noMorePeers chan struct{}
 
@@ -125,7 +119,6 @@ func NewProtocolManager(
 		engineMu:     engineMu,
 		newPeerCh:    make(chan *peer),
 		noMorePeers:  make(chan struct{}),
-		txsyncCh:     make(chan *txsync),
 		quitSync:     make(chan struct{}),
 
 		Instance: logger.MakeInstance(),
@@ -150,7 +143,7 @@ func (pm *ProtocolManager) peerMisbehaviour(peer string, err error) bool {
 
 func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.Fetcher, *ordering.EventBuffer) {
 	// checkers
-	lightCheck := func(e *inter.Event) error {
+	lightCheck := func(e dag.Event) error {
 		if err := checkers.Basiccheck.Validate(e); err != nil {
 			return err
 		}
@@ -160,14 +153,7 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 		return nil
 	}
 	bufferedCheck := func(e dag.Event, parents dag.Events) error {
-		var selfParent dag.Event
-		if e.SelfParent() != nil {
-			selfParent = parents[0]
-		}
 		if err := checkers.Parentscheck.Validate(e, parents); err != nil {
-			return err
-		}
-		if err := checkers.Gaspowercheck.Validate(e, selfParent); err != nil {
 			return err
 		}
 		return nil
@@ -346,7 +332,6 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 
 	// start sync handlers
 	go pm.syncer()
-	go pm.txsyncLoop()
 	pm.fetcher.Start()
 }
 
@@ -386,8 +371,9 @@ func (pm *ProtocolManager) newPeer(pv int, p *p2p.Peer, rw p2p.MsgReadWriter) *p
 }
 
 func (pm *ProtocolManager) myProgress() PeerProgress {
-	blockI, block := pm.engine.LastBlock()
-	epoch := pm.engine.GetEpoch()
+	blockI := pm.store.GetLatestBlockIndex()
+	block := pm.store.GetBlock(blockI).Atropos
+	epoch := pm.store.GetEpoch()
 	return PeerProgress{
 		Epoch:        epoch,
 		NumOfBlocks:  blockI,
@@ -418,10 +404,10 @@ func (pm *ProtocolManager) handle(p *peer) error {
 
 	// Execute the handshake
 	var (
-		genesis    = pm.engine.GetGenesisHash()
+		genesis    = pm.store.GetBlock(0).Atropos
 		myProgress = pm.myProgress()
 	)
-	if err := p.Handshake(pm.config.Net.NetworkID, myProgress, genesis); err != nil {
+	if err := p.Handshake(pm.config.Net.NetworkID, myProgress, common.Hash(genesis)); err != nil {
 		p.Log().Debug("Handshake failed", "err", err)
 		return err
 	}
@@ -434,10 +420,6 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		return err
 	}
 	defer pm.removePeer(p.id)
-
-	// Propagate existing transactions. new transactions appearing
-	// after this will be sent via broadcasts.
-	pm.syncTransactions(p)
 
 	// Handle incoming messages until the connection is torn down
 	for {
@@ -461,7 +443,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	}
 	defer msg.Discard()
 
-	myEpoch := pm.engine.GetEpoch()
+	myEpoch := pm.store.GetEpoch()
 	peerDwnlr := pm.downloader.Peer(p.id)
 
 	// Handle the message depending on its contents
@@ -519,7 +501,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if pm.fetcher.Overloaded() {
 			break
 		}
-		var events []*inter.Event
+		var events inter.Events
 		if err := msg.Decode(&events); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
@@ -528,9 +510,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 		// Mark the hashes as present at the remote node
 		for _, e := range events {
-			p.MarkEvent(e.Hash())
+			p.MarkEvent(e.ID())
 		}
-		_ = pm.fetcher.Enqueue(p.id, events, time.Now(), p.RequestEvents)
+		_ = pm.fetcher.Enqueue(p.id, events.Bases(), time.Now(), p.RequestEvents)
 
 	case msg.Code == GetEventsMsg:
 		var requests hash.Events
@@ -724,7 +706,7 @@ func (pm *ProtocolManager) BroadcastEvent(event *inter.Event, passed time.Durati
 	if passed < 0 {
 		passed = 0
 	}
-	id := event.Hash()
+	id := event.ID()
 	peers := pm.peers.PeersWithoutEvent(id)
 	if len(peers) == 0 {
 		log.Trace("Event is already known to all peers", "hash", id)
@@ -741,33 +723,10 @@ func (pm *ProtocolManager) BroadcastEvent(event *inter.Event, passed time.Durati
 	// Broadcast of event hash to the rest peers
 	hashBroadcast := peers[fullRecipients:]
 	for _, peer := range hashBroadcast {
-		peer.AsyncSendNewEventHashes(hash.Events{event.Hash()})
+		peer.AsyncSendNewEventHashes(hash.Events{event.ID()})
 	}
 	log.Trace("Broadcast event", "hash", id, "fullRecipients", len(fullBroadcast), "hashRecipients", len(hashBroadcast))
 	return len(peers)
-}
-
-// BroadcastTxs will propagate a batch of transactions to all peers which are not known to
-// already have the given transaction.
-func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
-	if len(txs) > softLimitItems {
-		txs = txs[:softLimitItems]
-	}
-
-	var txset = make(map[*peer]types.Transactions)
-
-	// Broadcast transactions to a batch of peers not knowing about it
-	for _, tx := range txs {
-		peers := pm.peers.PeersWithoutTx(tx.Hash())
-		for _, peer := range peers {
-			txset[peer] = append(txset[peer], tx)
-		}
-		log.Trace("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
-	}
-	// FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
-	for peer, txs := range txset {
-		peer.AsyncSendTransactions(txs)
-	}
 }
 
 // Mined broadcast loop
@@ -845,7 +804,7 @@ func (pm *ProtocolManager) onNewEpochLoop() {
 // known about the host peer.
 type NodeInfo struct {
 	Network     uint64      `json:"benchopera"` // benchopera ID
-	Genesis     common.Hash `json:"genesis"` // SHA3 hash of the host's genesis object
+	Genesis     common.Hash `json:"genesis"`    // SHA3 hash of the host's genesis object
 	Epoch       idx.Epoch   `json:"epoch"`
 	NumOfBlocks idx.Block   `json:"blocks"`
 	//Config  *params.ChainConfig `json:"config"`  // Chain configuration for the fork rules
@@ -853,11 +812,11 @@ type NodeInfo struct {
 
 // NodeInfo retrieves some protocol metadata about the running host node.
 func (pm *ProtocolManager) NodeInfo() *NodeInfo {
-	numOfBlocks, _ := pm.engine.LastBlock()
+	numOfBlocks := pm.store.GetLatestBlockIndex()
 	return &NodeInfo{
 		Network:     pm.config.Net.NetworkID,
-		Genesis:     pm.engine.GetGenesisHash(),
-		Epoch:       pm.engine.GetEpoch(),
+		Genesis:     common.Hash(pm.store.GetBlock(0).Atropos),
+		Epoch:       pm.store.GetEpoch(),
 		NumOfBlocks: numOfBlocks,
 	}
 }

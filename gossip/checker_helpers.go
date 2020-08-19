@@ -25,9 +25,9 @@ func (r *HeavyCheckReader) GetEpochPubKeys() (map[idx.ValidatorID][]byte, idx.Ep
 }
 
 // NewEpochPubKeys reads fills ValidatorsPubKeys with data from store
-func NewEpochPubKeys(epoch idx.Epoch, g *genesis.Genesis) *ValidatorsPubKeys {
+func NewEpochPubKeys(epoch idx.Epoch, vv genesis.Validators) *ValidatorsPubKeys {
 	pubKeys := make(map[idx.ValidatorID][]byte)
-	for _, it := range g.Validators {
+	for _, it := range vv {
 		pubKeys[it.ID] = it.PubKey
 	}
 	return &ValidatorsPubKeys{

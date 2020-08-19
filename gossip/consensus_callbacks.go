@@ -2,7 +2,7 @@ package gossip
 
 import (
 	"errors"
-	"github.com/Fantom-foundation/lachesis-base/eventcheck"
+	"github.com/Fantom-foundation/go-lachesis/eventcheck"
 	"github.com/Fantom-foundation/lachesis-base/inter/dag"
 	"github.com/Fantom-foundation/lachesis-base/inter/pos"
 	"github.com/Fantom-foundation/lachesis-base/lachesis"

@@ -9,8 +9,6 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/core/types"
-
 	"github.com/Fantom-foundation/go-lachesis/inter"
 
 	"github.com/Fantom-foundation/go-lachesis/benchopera"
@@ -38,7 +36,6 @@ type Reader interface {
 // Check which require only parents list + current epoch info
 type Checker struct {
 	config   *benchopera.DagConfig
-	txSigner types.Signer
 	reader   Reader
 
 	numOfThreads int
@@ -56,7 +53,7 @@ type TaskData struct {
 }
 
 // NewDefault uses N-1 threads
-func NewDefault(config *benchopera.DagConfig, reader Reader, txSigner types.Signer) *Checker {
+func NewDefault(config *benchopera.DagConfig, reader Reader) *Checker {
 	threads := runtime.NumCPU()
 	if threads > 1 {
 		threads--
@@ -64,14 +61,13 @@ func NewDefault(config *benchopera.DagConfig, reader Reader, txSigner types.Sign
 	if threads < 1 {
 		threads = 1
 	}
-	return New(config, reader, txSigner, threads)
+	return New(config, reader, threads)
 }
 
 // New validator which performs heavy checks, related to signatures validation and Merkle tree validation
-func New(config *benchopera.DagConfig, reader Reader, txSigner types.Signer, numOfThreads int) *Checker {
+func New(config *benchopera.DagConfig, reader Reader, numOfThreads int) *Checker {
 	return &Checker{
 		config:       config,
-		txSigner:     txSigner,
 		reader:       reader,
 		numOfThreads: numOfThreads,
 		tasksQ:       make(chan *TaskData, maxQueuedTasks),
@@ -95,7 +91,7 @@ func (v *Checker) Overloaded() bool {
 	return len(v.tasksQ) > maxQueuedTasks/2
 }
 
-func (v *Checker) Enqueue(events dag.Events, onValidated OnValidatedFn) error {
+func (v *Checker) Enqueue(events dag.Events, onValidated func(dag.Events, []error)) error {
 	// divide big batch into smaller ones
 	for start := 0; start < len(events); start += maxBatch {
 		end := len(events)

@@ -51,13 +51,9 @@ func DefaultConfig(network benchopera.Config) Config {
 		cfg.Emitter = emitter.FakeEmitterConfig()
 		// disable self-fork protection if fakenet 1/1
 		if len(network.Genesis.Validators) == 1 {
-			cfg.Emitter.EmitIntervals.SelfForkProtection = 0
+			cfg.Emitter.EmitIntervals.DoublesignProtection = 0
 		}
 	}
-	/*if benchopera.NetworkId == benchopera.DevNetworkId { // TODO dev benchopera
-		cfg.TxPool = evmcore.FakeTxPoolConfig()
-		cfg.Emitter = FakeEmitterConfig()
-	}*/
 
 	return cfg
 }

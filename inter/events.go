@@ -3,6 +3,7 @@ package inter
 import (
 	"bytes"
 	"github.com/Fantom-foundation/lachesis-base/hash"
+	"github.com/Fantom-foundation/lachesis-base/inter/dag"
 	"strings"
 )
 
@@ -27,6 +28,14 @@ func (ee Events) IDs() hash.Events {
 	res := make(hash.Events, 0, len(ee))
 	for _, e := range ee {
 		res.Add(e.ID())
+	}
+	return res
+}
+
+func (ee Events) Bases() dag.Events {
+	res := make(dag.Events, 0, ee.Len())
+	for _, e := range ee {
+		res = append(res, e)
 	}
 	return res
 }

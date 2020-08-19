@@ -3,24 +3,19 @@ package emitter
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/Fantom-foundation/go-lachesis/benchopera/genesis"
 	"github.com/Fantom-foundation/lachesis-base/emitter/ancestor"
 	"github.com/Fantom-foundation/lachesis-base/emitter/doublesign"
 	"github.com/Fantom-foundation/lachesis-base/hash"
+	"github.com/Fantom-foundation/lachesis-base/inter/dag"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/inter/pos"
+	"github.com/ethereum/go-ethereum/crypto"
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/Fantom-foundation/go-lachesis/eventcheck"
-	"github.com/Fantom-foundation/go-lachesis/eventcheck/basiccheck"
-	"github.com/Fantom-foundation/go-lachesis/gossip/piecefunc"
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-
 	"github.com/Fantom-foundation/go-lachesis/inter"
 
 	"github.com/Fantom-foundation/go-lachesis/benchopera"
@@ -30,12 +25,11 @@ import (
 
 // EmitterWorld is emitter's external world
 type EmitterWorld struct {
-	Store              EventSource
-	EngineMu           *sync.RWMutex
-	GetEpochValidators func() (idx.Epoch, *pos.Validators)
-	Epoch              func() idx.Epoch
-	ProcessEvent       func(*inter.Event) error
-	DagIndex           ancestor.DagIndex
+	Store        Reader
+	EngineMu     *sync.RWMutex
+	ProcessEvent func(*inter.Event) error
+	Build        func(dag.MutableEvent) error
+	DagIndex     ancestor.DagIndex
 
 	Checkers *eventcheck.Checkers
 
@@ -50,7 +44,7 @@ type Emitter struct {
 	world   EmitterWorld
 	privKey *ecdsa.PrivateKey
 
-	syncStatus selfForkProtection
+	syncStatus syncStatus
 
 	prevEmittedTime time.Time
 
@@ -62,14 +56,13 @@ type Emitter struct {
 	logger.Periodic
 }
 
-type selfForkProtection struct {
-	startup                       time.Time
-	lastConnected                 time.Time
-	p2pSynced                     time.Time
-	prevLocalEmittedID            hash.Event
-	lastExternalSelfEvent         time.Time
-	lastExternalSelfEventDetected time.Time
-	becameValidator               time.Time
+type syncStatus struct {
+	startup                   time.Time
+	lastConnected             time.Time
+	p2pSynced                 time.Time
+	prevLocalEmittedID        hash.Event
+	externalSelfEventCreated  time.Time
+	externalSelfEventDetected time.Time
 }
 
 // NewEmitter creation.
@@ -95,7 +88,7 @@ func NewEmitter(
 func (em *Emitter) init() {
 	em.syncStatus.lastConnected = time.Now()
 	em.syncStatus.startup = time.Now()
-	epoch, validators := em.world.GetEpochValidators()
+	validators, epoch := em.world.Store.GetEpochValidators()
 	em.OnNewEpoch(validators, epoch)
 }
 
@@ -169,7 +162,7 @@ func (em *Emitter) findBestParents(myValidatorID idx.ValidatorID) (*hash.Event, 
 	var strategy ancestor.SearchStrategy
 	dagIndex := em.world.DagIndex
 	if dagIndex != nil {
-		_, validators := em.world.GetEpochValidators()
+		validators, _ := em.world.Store.GetEpochValidators()
 		strategy = ancestor.NewCasualityStrategy(dagIndex, validators)
 		if rand.Intn(20) == 0 { // every 20th event uses random strategy is avoid repeating patterns in DAG
 			strategy = ancestor.NewRandomStrategy(rand.New(rand.NewSource(time.Now().UnixNano())))
@@ -184,13 +177,13 @@ func (em *Emitter) findBestParents(myValidatorID idx.ValidatorID) (*hash.Event, 
 }
 
 // createEvent is not safe for concurrent use.
-func (em *Emitter) createEvent(poolTxs map[common.Address]types.Transactions) *inter.Event {
+func (em *Emitter) createEvent(payload []byte) *inter.Event {
 	if em.config.Validator == 0 {
 		// not a validator
 		return nil
 	}
 
-	if synced := em.logSyncStatus(em.isSynced()); !synced {
+	if synced := em.logSyncStatus(em.isSyncedToEmit()); !synced {
 		// I'm reindexing my old events, so don't create events until connect all the existing self-events
 		return nil
 	}
@@ -203,106 +196,68 @@ func (em *Emitter) createEvent(poolTxs map[common.Address]types.Transactions) *i
 	)
 
 	// Find parents
-	selfParent, parents, ok := em.findBestParents(epoch, em.config.Validator)
+	selfParent, parents, ok := em.findBestParents(em.config.Validator)
 	if !ok {
 		return nil
 	}
 
 	// Set parent-dependent fields
-	parentHeaders := make([]*inter.Event, len(parents))
+	parentEvents := make(dag.Events, len(parents))
 	for i, p := range parents {
-		parent := em.world.Store.GetEvent(epoch, p)
+		parent := em.world.Store.GetEvent(p)
 		if parent == nil {
 			em.Log.Crit("Emitter: head not found", "event", p.String())
 		}
-		parentHeaders[i] = parent
-		if parentHeaders[i].Creator == em.config.Validator && i != 0 {
-			// there're 2 heads from me, i.e. due to a fork, findBestParents could have found multiple self-parents
-			em.Periodic.Error(5*time.Second, "I've created a fork, events emitting isn't allowed", "creator", em.config.Validator)
-			return nil
-		}
-		maxLamport = idx.MaxLamport(maxLamport, parent.Lamport)
+		parentEvents[i] = parent
+		maxLamport = idx.MaxLamport(maxLamport, parent.Lamport())
 	}
 
 	selfParentSeq = 0
 	selfParentTime = 0
-	var selfParentHeader *inter.Event
+	var selfParentEvent *inter.Event
 	if selfParent != nil {
-		selfParentHeader = parentHeaders[0]
-		selfParentSeq = selfParentHeader.Seq
-		selfParentTime = selfParentHeader.ClaimedTime
+		selfParentEvent = parentEvents[0].(*inter.Event)
+		selfParentSeq = selfParentEvent.Seq()
+		selfParentTime = selfParentEvent.CreationTime()
 	}
 
-	event := inter.NewEvent()
-	event.Epoch = epoch
-	event.Seq = selfParentSeq + 1
-	event.Creator = em.config.Validator
+	_, epoch := em.world.Store.GetEpochValidators()
+	mutEvent := &inter.MutableEvent{}
+	mutEvent.SetEpoch(epoch)
+	mutEvent.SetSeq(selfParentSeq + 1)
+	mutEvent.SetCreator(em.config.Validator)
 
-	event.Parents = parents
-	event.Lamport = maxLamport + 1
-	event.ClaimedTime = inter.MaxTimestamp(inter.Timestamp(time.Now().UnixNano()), selfParentTime+1)
-
-	// add version
-	if em.world.AddVersion != nil {
-		event = em.world.AddVersion(event)
-	}
+	mutEvent.SetParents(parents)
+	mutEvent.SetLamport(maxLamport + 1)
+	mutEvent.SetRawTime(dag.RawTimestamp(inter.MaxTimestamp(inter.Timestamp(time.Now().UnixNano()), selfParentTime+1)))
+	mutEvent.SetPayload(payload)
 
 	// set consensus fields
-	event = em.world.Engine.Prepare(event)
-	if event == nil {
-		em.Log.Warn("Dropped event while emitting")
-		return nil
-	}
-
-	// calc initial GasPower
-	validators := em.world.Engine.GetValidators()
-	event.GasPowerUsed = basiccheck.CalcGasPowerUsed(event, &em.net.Dag)
-	availableGasPower, err := em.world.Checkers.Gaspowercheck.CalcGasPower(&event.Event, selfParentHeader)
+	err := em.world.Build(mutEvent)
 	if err != nil {
-		em.Log.Warn("Gas power calculation failed", "err", err)
-		return nil
-	}
-	if event.GasPowerUsed > availableGasPower.Min() {
-		em.Periodic.Warn(time.Second, "Not enough gas power to emit event. Too small stake?",
-			"gasPower", availableGasPower,
-			"stake%", 100*float64(validators.Get(em.config.Validator))/float64(validators.TotalStake()))
-		return nil
-	}
-	event.GasPowerLeft = *availableGasPower.Sub(event.GasPowerUsed)
-
-	// Add txs
-	event = em.addTxs(event, poolTxs)
-
-	if !em.isAllowedToEmit(event, selfParentHeader) {
+		em.Log.Warn("Dropped event while emitting", "err", err)
 		return nil
 	}
 
-	// calc Merkle root
-	event.TxHash = types.DeriveSha(event.Transactions)
+	if !em.isAllowedToEmit(mutEvent) {
+		return nil
+	}
 
 	// sign
-	myAddress := em.myAddress
-	signer := func(data []byte) (sig []byte, err error) {
-		acc := accounts.Account{
-			Address: myAddress,
-		}
-		w, err := em.world.Am.Find(acc)
-		if err != nil {
-			return
-		}
-		return w.SignData(acc, MimetypeEvent, data)
-	}
-	if err := event.Sign(signer); err != nil {
-		em.Periodic.Error(time.Second, "Failed to sign event. Please unlock account.", "err", err)
+	h := mutEvent.HashToSign()
+	sigRSV, err := crypto.Sign(h[:], em.privKey)
+	if err != nil {
+		em.Periodic.Error(time.Second, "Failed to sign event", "err", err)
 		return nil
 	}
-	// calc hash after event is fully built
-	event.RecacheHash()
-	event.RecacheSize()
+	mutEvent.SetSig(inter.BytesToSignature(sigRSV[:inter.SigSize])) // drop V number
+
+	// build
+	event := mutEvent.Build()
 	{
 		// sanity check
 		if em.world.Checkers != nil {
-			if err := em.world.Checkers.Validate(event, parentHeaders); err != nil {
+			if err := em.world.Checkers.Validate(event, parentEvents); err != nil {
 				em.Periodic.Error(time.Second, "Signed event incorrectly", "err", err)
 				return nil
 			}
@@ -315,155 +270,76 @@ func (em *Emitter) createEvent(poolTxs map[common.Address]types.Transactions) *i
 	return event
 }
 
-var (
-	confirmingEmitIntervalPieces = []piecefunc.Dot{
-		{
-			X: 0,
-			Y: 1.0 * piecefunc.PercentUnit,
-		},
-		{
-			X: 0.33 * piecefunc.PercentUnit,
-			Y: 1.05 * piecefunc.PercentUnit,
-		},
-		{
-			X: 0.66 * piecefunc.PercentUnit,
-			Y: 1.20 * piecefunc.PercentUnit,
-		},
-		{
-			X: 0.8 * piecefunc.PercentUnit,
-			Y: 1.5 * piecefunc.PercentUnit,
-		},
-		{
-			X: 0.9 * piecefunc.PercentUnit,
-			Y: 3 * piecefunc.PercentUnit,
-		},
-		{
-			X: 1.0 * piecefunc.PercentUnit,
-			Y: 3.9 * piecefunc.PercentUnit,
-		},
-	}
-	maxEmitIntervalPieces = []piecefunc.Dot{
-		{
-			X: 0,
-			Y: 1.0 * piecefunc.PercentUnit,
-		},
-		{
-			X: 1.0 * piecefunc.PercentUnit,
-			Y: 0.89 * piecefunc.PercentUnit,
-		},
-	}
-)
-
 // OnNewEpoch should be called after each epoch change, and on startup
-func (em *Emitter) OnNewEpoch(newValidators *genesis.Validators, newEpoch idx.Epoch) {
-	// update myValidatorID
-	em.config.Validator, _ = em.findMyValidatorID()
-	em.prevEmittedTime = em.loadPrevEmitTime()
-
-	// validators with lower stake should emit less events to reduce benchopera load
-	// confirmingEmitInterval = piecefunc(totalStakeBeforeMe / totalStake) * MinEmitInterval
-	myIdx := newValidators.GetIdx(em.config.Validator)
-	totalStake := pos.Weight(0)
-	totalStakeBeforeMe := pos.Weight(0)
-	for i, stake := range newValidators.SortedStakes() {
-		totalStake += stake
-		if idx.Validator(i) < myIdx {
-			totalStakeBeforeMe += stake
-		}
-	}
-	stakeRatio := uint64((totalStakeBeforeMe * piecefunc.PercentUnit) / totalStake)
-	confirmingEmitIntervalRatio := piecefunc.Get(stakeRatio, confirmingEmitIntervalPieces)
-	em.intervals.Confirming = time.Duration(piecefunc.Mul(uint64(em.config.EmitIntervals.Confirming), confirmingEmitIntervalRatio))
-
-	// validators with lower stake should emit more events at idle, to catch up with other validators if their frame is behind
-	// MaxEmitInterval = piecefunc(totalStakeBeforeMe / totalStake) * MaxEmitInterval
-	maxEmitIntervalRatio := piecefunc.Get(stakeRatio, maxEmitIntervalPieces)
-	em.intervals.Max = time.Duration(piecefunc.Mul(uint64(em.config.EmitIntervals.Max), maxEmitIntervalRatio))
-
-	// track when I've became validator
-	now := time.Now()
-	if em.config.Validator != 0 && !em.world.App.HasEpochValidator(newEpoch-1, em.config.Validator) {
-		em.syncStatus.becameValidator = now
-	}
-}
+func (em *Emitter) OnNewEpoch(newValidators *pos.Validators, newEpoch idx.Epoch) {}
 
 // OnNewEvent tracks new events to find out am I properly synced or not
 func (em *Emitter) OnNewEvent(e *inter.Event) {
-	if em.config.Validator == 0 || em.config.Validator != e.Creator {
+	if em.config.Validator == 0 || em.config.Validator != e.Creator() {
 		return
 	}
-	if em.syncStatus.prevLocalEmittedID == e.Hash() {
+	if em.syncStatus.prevLocalEmittedID == e.ID() {
 		return
 	}
-
 	// event was emitted by me on another instance
-	em.syncStatus.lastExternalSelfEvent = time.Now()
+	em.onNewExternalEvent(e)
 
-	eventTime := inter.MaxTimestamp(e.ClaimedTime, e.MedianTime).Time()
-	if eventTime.Before(em.syncStatus.startup) {
-		return
-	}
-
-	passedSinceEvent := time.Since(eventTime)
-	threshold := em.intervals.SelfForkProtection
-	if threshold > time.Minute {
-		threshold = time.Minute
-	}
-	if passedSinceEvent <= threshold {
+}
+func (em *Emitter) onNewExternalEvent(e *inter.Event) {
+	em.syncStatus.externalSelfEventDetected = time.Now()
+	em.syncStatus.externalSelfEventCreated = e.CreationTime().Time()
+	status := em.currentSyncStatus()
+	if doublesign.DetectParallelInstance(status, em.config.EmitIntervals.ParallelInstanceProtection) {
+		passedSinceEvent := status.Since(status.ExternalSelfEventCreated)
 		reason := "Received a recent event (event id=%s) from this validator (validator ID=%d) which wasn't created on this node.\n" +
 			"This external event was created %s, %s ago at the time of this error.\n" +
 			"It might mean that a duplicating instance of the same validator is running simultaneously, which may eventually lead to a doublesign.\n" +
 			"The node was stopped by one of the doublesign protection heuristics.\n" +
 			"There's no guaranteed automatic protection against a doublesign," +
 			"please always ensure that no more than one instance of the same validator is running."
-		errlock.Permanent(fmt.Errorf(reason, e.Hash().String(), em.config.Validator, e.ClaimedTime.Time().Local().String(), passedSinceEvent.String()))
+		errlock.Permanent(fmt.Errorf(reason, e.ID().String(), em.config.Validator, e.CreationTime().Time().Local().String(), passedSinceEvent.String()))
+		panic("unreachable")
 	}
-
-}
-func (em *Emitter) onNewExternalEvent(e *inter.Event) {
-	// event was emitted by me on another instance
-	em.syncStatus.lastExternalSelfEvent = time.Now()
-	doublesign.DetectParallelInstance()
 }
 
-func (em *Emitter) getSyncStatus() doublesign.SyncStatus {
+func (em *Emitter) currentSyncStatus() doublesign.SyncStatus {
 	return doublesign.SyncStatus{
-		PeersNum:              em.world.PeersNum(),
-		Now:                   time.Now(),
-		Startup:               em.syncStatus.startup,
-		LastConnected:         em.syncStatus.lastConnected,
-		P2PSynced:             em.syncStatus.p2pSynced,
-		BecameValidator:       em.syncStatus.becameValidator,
-		LastSelfExternalEvent: em.syncStatus.lastExternalSelfEvent,
+		Now:                       time.Now(),
+		PeersNum:                  em.world.PeersNum(),
+		Startup:                   em.syncStatus.startup,
+		LastConnected:             em.syncStatus.lastConnected,
+		P2PSynced:                 em.syncStatus.p2pSynced,
+		ExternalSelfEventCreated:  em.syncStatus.externalSelfEventCreated,
+		ExternalSelfEventDetected: em.syncStatus.externalSelfEventDetected,
 	}
 }
 
 func (em *Emitter) isSyncedToEmit() (time.Duration, error) {
-	if em.intervals.SelfForkProtection == 0 {
+	if em.intervals.DoublesignProtection == 0 {
 		return 0, nil // protection disabled
 	}
-	return doublesign.SyncedToEmit(em.getSyncStatus(), em.intervals.SelfForkProtection)
+	return doublesign.SyncedToEmit(em.currentSyncStatus(), em.intervals.DoublesignProtection)
 }
 
-func (em *Emitter) logSyncStatus(synced bool, reason string, wait time.Duration) bool {
-	if synced {
+func (em *Emitter) logSyncStatus(wait time.Duration, syncErr error) bool {
+	if syncErr == nil {
 		return true
 	}
 
 	if wait == 0 {
-		em.Periodic.Info(25*time.Second, "Emitting is paused", "reason", reason)
+		em.Periodic.Info(25*time.Second, "Emitting is paused", "reason", syncErr.Error())
 	} else {
-		em.Periodic.Info(25*time.Second, "Emitting is paused", "reason", reason, "wait", wait)
+		em.Periodic.Info(25*time.Second, "Emitting is paused", "reason", syncErr.Error(), "wait", wait)
 	}
 	return false
 }
 
 // return true if event is in epoch tail (unlikely to confirm)
-func (em *Emitter) isEpochTail(e *inter.Event) bool {
+func (em *Emitter) isEpochTail(e dag.Event) bool {
 	return e.Frame() >= idx.Frame(em.net.Dag.MaxEpochBlocks)-em.config.EpochTailLength
 }
 
-func (em *Emitter) isAllowedToEmit(e *inter.Event, selfParent *inter.Event) bool {
+func (em *Emitter) isAllowedToEmit(e *inter.MutableEvent) bool {
 	passedTime := e.CreationTime().Time().Sub(em.prevEmittedTime)
 	// Slow down emitting if no payload to post, and not at epoch tail
 	{
@@ -482,52 +358,37 @@ func (em *Emitter) EmitEvent() *inter.Event {
 		return nil // short circuit if not validator
 	}
 
-	poolTxs, err := em.world.Txpool.Pending() // request txs before locking engineMu to prevent deadlock!
-	if err != nil {
-		em.Log.Error("Tx pool transactions fetching error", "err", err)
-		return nil
-	}
-
-	for _, tt := range poolTxs {
-		for _, t := range tt {
-			span := tracing.CheckTx(t.Hash(), "Emitter.EmitEvent(candidate)")
-			defer span.Finish()
-		}
-	}
+	start := time.Now()
 
 	em.world.EngineMu.Lock()
 	defer em.world.EngineMu.Unlock()
 
-	e := em.createEvent(poolTxs)
+	e := em.createEvent([]byte{})
 	if e == nil {
 		return nil
 	}
-	em.syncStatus.prevLocalEmittedID = e.Hash()
+	em.syncStatus.prevLocalEmittedID = e.ID()
 
-	if em.world.OnEmitted != nil {
-		em.world.OnEmitted(e)
+	err := em.world.ProcessEvent(e)
+	if err != nil {
+		em.Log.Error("Emitted event connection error", "err", err)
+		return nil
 	}
-	em.gasRate.Mark(int64(e.GasPowerUsed))
 	em.prevEmittedTime = time.Now() // record time after connecting, to add the event processing time"
-	em.Log.Info("New event emitted", "id", e.Hash(), "parents", len(e.Parents), "by", e.Creator, "frame", inter.FmtFrame(e.Frame, e.IsRoot), "txs", e.Transactions.Len(), "t", time.Since(e.ClaimedTime.Time()))
 
-	// metrics
-	for _, t := range e.Transactions {
-		span := tracing.CheckTx(t.Hash(), "Emitter.EmitEvent()")
-		defer span.Finish()
-	}
+	em.Log.Info("New event emitted", "id", e.ID(), "parents", len(e.Parents()), "by", e.Creator, "frame", inter.FmtFrame(e.Frame(), e.IsRoot()), "payload", len(e.Payload()), "t", time.Since(start))
 
 	return e
 }
 
 func (em *Emitter) nameEventForDebug(e *inter.Event) {
-	name := []rune(hash.GetNodeName(e.Creator))
+	name := []rune(hash.GetNodeName(e.Creator()))
 	if len(name) < 1 {
 		return
 	}
 
 	name = name[len(name)-1:]
-	hash.SetEventName(e.Hash(), fmt.Sprintf("%s%03d",
+	hash.SetEventName(e.ID(), fmt.Sprintf("%s%03d",
 		strings.ToLower(string(name)),
 		e.Seq))
 }

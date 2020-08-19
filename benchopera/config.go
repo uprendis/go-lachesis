@@ -31,13 +31,6 @@ type Config struct {
 	Dag DagConfig
 }
 
-// EvmChainConfig returns ChainConfig for transaction signing and execution
-func (c *Config) EvmChainConfig() *ethparams.ChainConfig {
-	cfg := *ethparams.AllEthashProtocolChanges
-	cfg.ChainID = new(big.Int).SetUint64(c.NetworkID)
-	return &cfg
-}
-
 func FakeNetConfig(accs genesis.Validators) Config {
 	return Config{
 		Name:      "fake",

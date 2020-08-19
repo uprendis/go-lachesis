@@ -25,9 +25,8 @@ const protocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a prot
 
 // protocol message codes
 const (
-	StatusMsg = 0x00
-
 	// Protocol messages belonging to benchopera/62
+	StatusMsg = 0x00
 
 	// Signals about the current synchronization status.
 	// The current peer's status is used during packs downloading,

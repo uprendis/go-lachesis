@@ -40,6 +40,17 @@ func (e *MutableEvent) DecodeRLP(src *rlp.Stream) error {
 	return e.UnmarshalBinary(bytes)
 }
 
+// DecodeRLP implements rlp.Decoder interface.
+func (e *Event) DecodeRLP(src *rlp.Stream) error {
+	mutE := MutableEvent{}
+	err := mutE.DecodeRLP(src)
+	if err != nil {
+		return err
+	}
+	*e = *mutE.Build()
+	return nil
+}
+
 // MarshalBinary implements encoding.BinaryMarshaler interface.
 func (e *Event) MarshalBinary() ([]byte, error) {
 	fields64 := []uint64{
@@ -58,8 +69,8 @@ func (e *Event) MarshalBinary() ([]byte, error) {
 	}
 
 	header3 := fast.NewBitArray(
-		4, // bits for storing sizes 1-8 of uint64 fields (forced to 4 because fast.BitArray)
-		1 + uint(len(fields64)), // version + fields64
+		4,                     // bits for storing sizes 1-8 of uint64 fields (forced to 4 because fast.BitArray)
+		1+uint(len(fields64)), // version + fields64
 	)
 	header2 := fast.NewBitArray(
 		2, // bits for storing sizes 1-4 of uint32 fields
@@ -107,8 +118,7 @@ func (e *Event) MarshalBinary() ([]byte, error) {
 	}
 
 	buf.Write(e.Payload())
-	sig := e.Sig()
-	buf.Write(sig[:])
+	buf.Write(e.Sig().Bytes())
 
 	length := header3.Size() + header2.Size() + buf.Position()
 	return raw[:length], nil
@@ -134,6 +144,8 @@ func (e *MutableEvent) UnmarshalBinary(raw []byte) (err error) {
 		}
 	}()
 
+	origRaw := raw
+
 	var rawTime dag.RawTimestamp
 	fields64 := []*uint64{
 		(*uint64)(&rawTime),
@@ -158,8 +170,8 @@ func (e *MutableEvent) UnmarshalBinary(raw []byte) (err error) {
 	}
 
 	header3 := fast.NewBitArray(
-		4, // bits for storing sizes 1-8 of uint64 fields (forced to 4 because fast.BitArray)
-		1 + uint(len(fields64)), // version + fields64
+		4,                     // bits for storing sizes 1-8 of uint64 fields (forced to 4 because fast.BitArray)
+		1+uint(len(fields64)), // version + fields64
 	)
 	header2 := fast.NewBitArray(
 		2, // bits for storing sizes 1-4 of uint32 fields
@@ -210,9 +222,8 @@ func (e *MutableEvent) UnmarshalBinary(raw []byte) (err error) {
 	if len(raw)-buf.Position() < SigSize {
 		return errors.New("malformed signature")
 	}
-	e.payload = buf.Read(len(raw) - buf.Position() - SigSize)
+	payload := buf.Read(len(raw) - buf.Position() - SigSize)
 	sig := buf.Read(SigSize)
-	copy(e.sig[:], sig)
 
 	e.SetVersion(uint8(ver))
 	e.SetRawTime(rawTime)
@@ -223,6 +234,11 @@ func (e *MutableEvent) UnmarshalBinary(raw []byte) (err error) {
 	e.SetCreator(creator)
 	e.SetLamport(lamport)
 	e.SetParents(parents)
+	e.SetPayload(payload)
+	e.SetSig(BytesToSignature(sig))
+
+	// set caches
+	e.fillCaches(origRaw)
 
 	return nil
 }

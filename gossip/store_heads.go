@@ -47,8 +47,8 @@ func (s *Store) IsHead(epoch idx.Epoch, id hash.Event) bool {
 }
 
 // GetHeads returns IDs of all the epoch events with no descendants
-func (s *Store) GetHeads(epoch idx.Epoch) hash.Events {
-	es := s.getEpochStore(epoch)
+func (s *Store) GetHeads() hash.Events {
+	es := s.getEpochStore(s.GetEpoch())
 	if es == nil {
 		return nil
 	}

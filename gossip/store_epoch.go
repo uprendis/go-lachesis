@@ -61,8 +61,8 @@ func (s *Store) SetLastEvent(epoch idx.Epoch, from idx.ValidatorID, id hash.Even
 }
 
 // GetLastEvent returns stored last unconfirmed event from a validator (off-chain)
-func (s *Store) GetLastEvent(epoch idx.Epoch, from idx.ValidatorID) *hash.Event {
-	es := s.getEpochStore(epoch)
+func (s *Store) GetLastEvent(from idx.ValidatorID) *hash.Event {
+	es := s.getEpochStore(s.GetEpoch())
 	if es == nil {
 		return nil
 	}

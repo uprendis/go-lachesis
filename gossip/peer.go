@@ -23,13 +23,7 @@ var (
 )
 
 const (
-	maxKnownTxs    = 24576 // Maximum transactions hashes to keep in the known list (prevent DOS)
 	maxKnownEvents = 16384 // Maximum event hashes to keep in the known list (prevent DOS)
-
-	// maxQueuedTxs is the maximum number of transaction lists to queue up before
-	// dropping broadcasts. This is a sensitive number as a transaction list might
-	// contain a single transaction, or thousands.
-	maxQueuedTxs = 128
 
 	// maxQueuedProps is the maximum number of event propagations to queue up before
 	// dropping broadcasts.
@@ -58,7 +52,6 @@ type peer struct {
 
 	version int // Protocol version negotiated
 
-	knownTxs    mapset.Set                // Set of transaction hashes known to be known by this peer
 	knownEvents mapset.Set                // Set of event hashes known to be known by this peer
 	queuedProps chan inter.Events         // Queue of events to broadcast to the peer
 	queuedAnns  chan hash.Events          // Queue of events to announce to the peer
@@ -106,7 +99,6 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 		rw:          rw,
 		version:     version,
 		id:          fmt.Sprintf("%x", p.ID().Bytes()[:8]),
-		knownTxs:    mapset.NewSet(),
 		knownEvents: mapset.NewSet(),
 		queuedProps: make(chan inter.Events, maxQueuedProps),
 		queuedAnns:  make(chan hash.Events, maxQueuedAnns),
@@ -240,32 +232,6 @@ func (p *peer) AsyncSendEvents(events inter.Events) {
 		p.Log().Debug("Dropping event propagation", "count", len(events))
 	}
 }
-
-// SendEvents sends a batch of event headers to the remote peer.
-/*func (p *peer) SendEvents(headers []*EvmHeader) error {
-	return p2p.Send(p.rw, EventsMsg, headers)
-}*/
-
-/*// RequestOneHeader is a wrapper around the header query functions to fetch a
-// single header. It is used solely by the fetcher.
-func (p *peer) RequestOneHeader(hash common.Hash) error {
-	p.Log().Debug("Fetching single header", "hash", hash)
-	return p2p.Send(p.rw, GetEventsMsg, &getEventsData{Origin: hashOrNumber{Hash: hash}, Amount: uint64(1), Skip: uint64(0), Reverse: false})
-}
-
-// RequestHeadersByHash fetches a batch of events' headers corresponding to the
-// specified header query, based on the hash of an origin event.
-func (p *peer) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
-	p.Log().Debug("Fetching batch of headers", "count", amount, "fromhash", origin, "skip", skip, "reverse", reverse)
-	return p2p.Send(p.rw, GetEventsMsg, &getEventsData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
-}
-
-// RequestHeadersByNumber fetches a batch of events' headers corresponding to the
-// specified header query, based on the number of an origin event.
-func (p *peer) RequestHeadersByNumber(origin uint64, amount int, skip int, reverse bool) error {
-	p.Log().Debug("Fetching batch of headers", "count", amount, "fromnum", origin, "skip", skip, "reverse", reverse)
-	return p2p.Send(p.rw, GetEventsMsg, &getEventsData{Origin: hashOrNumber{Number: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
-}*/
 
 func (p *peer) RequestEvents(ids hash.Events) error {
 	// divide big batch into smaller ones
@@ -461,21 +427,6 @@ func (ps *peerSet) List() []*peer {
 	list := make([]*peer, 0, len(ps.peers))
 	for _, p := range ps.peers {
 		list = append(list, p)
-	}
-	return list
-}
-
-// PeersWithoutTx retrieves a list of peers that do not have a given transaction
-// in their set of known hashes.
-func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*peer {
-	ps.lock.RLock()
-	defer ps.lock.RUnlock()
-
-	list := make([]*peer, 0, len(ps.peers))
-	for _, p := range ps.peers {
-		if !p.knownTxs.Contains(hash) {
-			list = append(list, p)
-		}
 	}
 	return list
 }

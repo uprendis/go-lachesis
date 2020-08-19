@@ -3,6 +3,8 @@ package gossip
 import (
 	"fmt"
 	"github.com/Fantom-foundation/go-lachesis/gossip/emitter"
+	"github.com/Fantom-foundation/lachesis-base/eventcheck/epochcheck"
+	"github.com/Fantom-foundation/lachesis-base/inter/dag"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/lachesis"
 	"math/rand"
@@ -24,7 +26,6 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/ethapi"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/basiccheck"
-	"github.com/Fantom-foundation/go-lachesis/eventcheck/epochcheck"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/heavycheck"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/parentscheck"
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
@@ -32,7 +33,6 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/inter"
 
 	"github.com/Fantom-foundation/go-lachesis/benchopera"
-	"github.com/Fantom-foundation/go-lachesis/benchopera/params"
 	"github.com/Fantom-foundation/go-lachesis/logger"
 )
 
@@ -61,14 +61,6 @@ func (f *ServiceFeed) SubscribeNewPack(ch chan<- idx.Pack) notify.Subscription {
 
 func (f *ServiceFeed) SubscribeNewEmitted(ch chan<- *inter.Event) notify.Subscription {
 	return f.scope.Track(f.newEmittedEvent.Subscribe(ch))
-}
-
-func (f *ServiceFeed) SubscribeNewBlock(ch chan<- evmcore.ChainHeadNotify) notify.Subscription {
-	return f.scope.Track(f.newBlock.Subscribe(ch))
-}
-
-func (f *ServiceFeed) SubscribeNewTxs(ch chan<- core.NewTxsEvent) notify.Subscription {
-	return f.scope.Track(f.newTxs.Subscribe(ch))
 }
 
 func (f *ServiceFeed) SubscribeNewLogs(ch chan<- []*types.Log) notify.Subscription {
@@ -132,13 +124,12 @@ func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine l
 	svc.serverPool = newServerPool(store.async.table.Peers, svc.done, &svc.wg, trustedNodes)
 
 	// create checkers
-	svc.heavyCheckReader.Addrs.Store(ReadEpochPubKeys(svc.app, svc.engine.GetEpoch()))                                                                     // read pub keys of current epoch from disk
-	svc.gasPowerCheckReader.Ctx.Store(ReadGasPowerContext(svc.store, svc.app, svc.engine.GetValidators(), svc.engine.GetEpoch(), &svc.config.Net.Economy)) // read gaspower check data from disk
-	svc.checkers = makeCheckers(&svc.config.Net, &svc.heavyCheckReader, &svc.gasPowerCheckReader, svc.engine, svc.store)
+	svc.heavyCheckReader.PubKeys.Store(NewEpochPubKeys(svc.store.GetEpoch(), svc.config.Net.Genesis.Validators))                                                                     // read pub keys of current epoch from disk
+	svc.checkers = makeCheckers(&svc.config.Net, &svc.heavyCheckReader, svc.store)
 
 	// create protocol manager
 	var err error
-	svc.pm, err = NewProtocolManager(config, &svc.feed, svc.txpool, svc.engineMu, svc.checkers, store, svc.engine, svc.serverPool)
+	svc.pm, err = NewProtocolManager(config, &svc.feed, svc.engineMu, svc.checkers, store, svc.processEvent, svc.serverPool)
 
 	// create API backend
 	svc.API = &APIBackend{config.ExtRPCEnabled, svc, stateReader, nil}
@@ -146,22 +137,16 @@ func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine l
 	return svc, err
 }
 
-// GetEngine returns service's engine
-func (s *Service) GetEngine() Consensus {
-	return s.engine
-}
-
 // makeCheckers builds event checkers
-func makeCheckers(net *benchopera.Config, heavyCheckReader *HeavyCheckReader, gasPowerCheckReader *GasPowerCheckReader, engine Consensus, store *Store) *eventcheck.Checkers {
+func makeCheckers(net *benchopera.Config, heavyCheckReader *HeavyCheckReader, store *Store) *eventcheck.Checkers {
 	// create signatures checker
-	ledgerID := net.EvmChainConfig().ChainID
-	heavyCheck := heavycheck.NewDefault(&net.Dag, heavyCheckReader, types.NewEIP155Signer(ledgerID))
+	heavyCheck := heavycheck.NewDefault(&net.Dag, heavyCheckReader)
 
 	return &eventcheck.Checkers{
-		Basiccheck:    basiccheck.New(&net.Dag),
-		Epochcheck:    epochcheck.New(&net.Dag, engine),
-		Parentscheck:  parentscheck.New(&net.Dag),
-		Heavycheck:    heavyCheck,
+		Basiccheck:   basiccheck.New(&net.Dag),
+		Epochcheck:   epochcheck.New(store),
+		Parentscheck: parentscheck.New(),
+		Heavycheck:   heavyCheck,
 	}
 }
 
@@ -171,19 +156,14 @@ func (s *Service) makeEmitter() *emitter.Emitter {
 	emitterCfg := s.config.Emitter // copy data
 	emitterCfg.EmitIntervals = *emitterCfg.EmitIntervals.RandomizeEmitTime(r)
 
-	return emitter.NewEmitter(&s.config.Net, &emitterCfg,
+	return emitter.NewEmitter(&s.config.Net, nil, &emitterCfg,
 		emitter.EmitterWorld{
-			Am:          s.AccountManager(),
-			Engine:      s.engine,
-			EngineMu:    s.engineMu,
-			Store:       s.store,
-			App:         s.app,
-			Txpool:      s.txpool,
-			OccurredTxs: s.occurredTxs,
-			OnEmitted: func(emitted *inter.Event) {
+			Store:    s.store,
+			EngineMu: s.engineMu,
+			ProcessEvent: func(emitted *inter.Event) error {
 				// s.engineMu is locked here
 
-				err := s.engine.ProcessEvent(emitted)
+				err := s.processEvent(emitted)
 				if err != nil {
 					s.Log.Crit("Self-event connection failed", "err", err.Error())
 				}
@@ -192,25 +172,16 @@ func (s *Service) makeEmitter() *emitter.Emitter {
 				if err != nil {
 					s.Log.Crit("Failed to post self-event", "err", err.Error())
 				}
+				return nil
+			},
+			Build: func(event dag.MutableEvent) error {
+				return s.engine.Build(event)
 			},
 			IsSynced: func() bool {
 				return atomic.LoadUint32(&s.pm.synced) != 0
 			},
 			PeersNum: func() int {
 				return s.pm.peers.Len()
-			},
-			AddVersion: func(e *inter.Event) *inter.Event {
-				// serialization version
-				e.Version = 0
-				// node version
-				if e.Seq <= 1 && len(s.config.Emitter.VersionToPublish) > 0 {
-					version := []byte("v-" + s.config.Emitter.VersionToPublish)
-					if len(version) <= params.MaxExtraData {
-						e.Extra = version
-					}
-				}
-
-				return e
 			},
 			Checkers: s.checkers,
 		},
@@ -258,8 +229,7 @@ func (s *Service) Start(srv *p2p.Server) error {
 	// Start the RPC service
 	s.netRPCService = ethapi.NewPublicNetAPI(srv, s.config.Net.NetworkID)
 
-	var genesis common.Hash
-	genesis = s.engine.GetGenesisHash()
+	genesis := s.store.GetBlock(0).Atropos
 	s.Topic = discv5.Topic("benchopera@" + genesis.Hex())
 
 	if srv.DiscV5 != nil {
@@ -276,7 +246,6 @@ func (s *Service) Start(srv *p2p.Server) error {
 	s.serverPool.start(srv, s.Topic)
 
 	s.emitter = s.makeEmitter()
-	s.emitter.SetValidator(s.config.Emitter.Validator)
 	s.emitter.StartEventEmission()
 
 	return nil

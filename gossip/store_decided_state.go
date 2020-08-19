@@ -2,6 +2,7 @@ package gossip
 
 import (
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
+	"github.com/Fantom-foundation/lachesis-base/inter/pos"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -50,6 +51,12 @@ func (s *Store) GetEpochState() EpochState {
 // GetEpoch retrieves the current epoch
 func (s *Store) GetEpoch() idx.Epoch {
 	return s.GetEpochState().Epoch
+}
+
+// GetEpoch retrieves the current epoch and validators atomically
+func (s *Store) GetEpochValidators() (*pos.Validators, idx.Epoch) {
+	state := s.GetEpochState()
+	return state.Validators, state.Epoch
 }
 
 // GetEpoch retrieves the current block number

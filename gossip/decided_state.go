@@ -12,5 +12,5 @@ type BlockState struct {
 
 type EpochState struct {
 	Epoch      idx.Epoch
-	Validators pos.Validators
+	Validators *pos.Validators
 }
