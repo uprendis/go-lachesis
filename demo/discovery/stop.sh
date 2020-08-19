@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# kill all bootnode and network processes
+# kill all bootnode and benchopera processes
 pkill "bootnode"
-pkill "lachesis"
+pkill "benchopera"
 
 # remove demo data
-#rm -rf /tmp/network-demo/datadir/
+#rm -rf /tmp/benchopera-demo/datadir/

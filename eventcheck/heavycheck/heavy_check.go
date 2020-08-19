@@ -2,22 +2,22 @@ package heavycheck
 
 import (
 	"errors"
+	"github.com/Fantom-foundation/lachesis-base/eventcheck/epochcheck"
+	"github.com/Fantom-foundation/lachesis-base/inter/dag"
+	"github.com/Fantom-foundation/lachesis-base/inter/idx"
+	"github.com/ethereum/go-ethereum/crypto"
 	"runtime"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/Fantom-foundation/go-lachesis/eventcheck/epochcheck"
 	"github.com/Fantom-foundation/go-lachesis/inter"
 
-	"github.com/Fantom-foundation/go-lachesis/network"
+	"github.com/Fantom-foundation/go-lachesis/benchopera"
 )
 
 var (
-	ErrWrongEventSig  = errors.New("event has wrong signature")
-	ErrMalformedTxSig = errors.New("tx has wrong signature")
-	ErrWrongTxHash    = errors.New("tx has wrong txs Merkle tree root")
+	ErrWrongEventSig = errors.New("event has wrong signature")
 
 	errTerminated = errors.New("terminated") // internal err
 )
@@ -28,18 +28,18 @@ const (
 )
 
 // OnValidatedFn is a callback type for notifying about validation result.
-type OnValidatedFn func(*TaskData)
+type OnValidatedFn func(dag.Events, []error)
 
-// DagReader is accessed by the validator to get the current state.
-type DagReader interface {
-	GetEpochPubKeys() (map[idx.StakerID]common.Address, idx.Epoch)
+// Reader is accessed by the validator to get the current state.
+type Reader interface {
+	GetEpochPubKeys() (map[idx.ValidatorID][]byte, idx.Epoch)
 }
 
 // Check which require only parents list + current epoch info
 type Checker struct {
-	config   *network.DagConfig
+	config   *benchopera.DagConfig
 	txSigner types.Signer
-	reader   DagReader
+	reader   Reader
 
 	numOfThreads int
 
@@ -49,14 +49,14 @@ type Checker struct {
 }
 
 type TaskData struct {
-	Events inter.Events // events to validate
-	Result []error      // resulting errors of events, nil if ok
+	Events dag.Events // events to validate
+	Result []error    // resulting errors of events, nil if ok
 
 	onValidated OnValidatedFn
 }
 
 // NewDefault uses N-1 threads
-func NewDefault(config *network.DagConfig, reader DagReader, txSigner types.Signer) *Checker {
+func NewDefault(config *benchopera.DagConfig, reader Reader, txSigner types.Signer) *Checker {
 	threads := runtime.NumCPU()
 	if threads > 1 {
 		threads--
@@ -68,7 +68,7 @@ func NewDefault(config *network.DagConfig, reader DagReader, txSigner types.Sign
 }
 
 // New validator which performs heavy checks, related to signatures validation and Merkle tree validation
-func New(config *network.DagConfig, reader DagReader, txSigner types.Signer, numOfThreads int) *Checker {
+func New(config *benchopera.DagConfig, reader Reader, txSigner types.Signer, numOfThreads int) *Checker {
 	return &Checker{
 		config:       config,
 		txSigner:     txSigner,
@@ -95,7 +95,7 @@ func (v *Checker) Overloaded() bool {
 	return len(v.tasksQ) > maxQueuedTasks/2
 }
 
-func (v *Checker) Enqueue(events inter.Events, onValidated OnValidatedFn) error {
+func (v *Checker) Enqueue(events dag.Events, onValidated OnValidatedFn) error {
 	// divide big batch into smaller ones
 	for start := 0; start < len(events); start += maxBatch {
 		end := len(events)
@@ -117,30 +117,24 @@ func (v *Checker) Enqueue(events inter.Events, onValidated OnValidatedFn) error 
 }
 
 // Validate event
-func (v *Checker) Validate(e *inter.Event) error {
-	addrs, epoch := v.reader.GetEpochPubKeys()
-	if e.Epoch != epoch {
+func (v *Checker) Validate(de dag.Event) error {
+	e := de.(*inter.Event)
+	pubKeys, epoch := v.reader.GetEpochPubKeys()
+	if e.Epoch() != epoch {
 		return epochcheck.ErrNotRelevant
 	}
-	// stakerID
-	addr, ok := addrs[e.Creator]
+	// validatorID
+	pubKey, ok := pubKeys[e.Creator()]
 	if !ok {
 		return epochcheck.ErrAuth
 	}
+
 	// event sig
-	if !e.VerifySignature(addr) {
+	signedHash := e.HashToSign()
+	sig := e.Sig()
+	ok = crypto.VerifySignature(pubKey, signedHash[:], sig[:])
+	if !ok {
 		return ErrWrongEventSig
-	}
-	// pre-cache tx sig
-	for _, tx := range e.Transactions {
-		_, err := types.Sender(v.txSigner, tx)
-		if err != nil {
-			return ErrMalformedTxSig
-		}
-	}
-	// Merkle tree
-	if e.TxHash != types.DeriveSha(e.Transactions) {
-		return ErrWrongTxHash
 	}
 
 	return nil
@@ -158,7 +152,7 @@ func (v *Checker) loop() {
 			for i, e := range op.Events {
 				op.Result[i] = v.Validate(e)
 			}
-			op.onValidated(op)
+			op.onValidated(op.Events, op.Result)
 		}
 	}
 }

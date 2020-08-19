@@ -2,6 +2,9 @@ package gossip
 
 import (
 	"fmt"
+	"github.com/Fantom-foundation/go-lachesis/gossip/emitter"
+	"github.com/Fantom-foundation/lachesis-base/inter/idx"
+	"github.com/Fantom-foundation/lachesis-base/lachesis"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -18,23 +21,18 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/Fantom-foundation/go-lachesis/app"
 	"github.com/Fantom-foundation/go-lachesis/ethapi"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/basiccheck"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/epochcheck"
-	"github.com/Fantom-foundation/go-lachesis/eventcheck/gaspowercheck"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/heavycheck"
 	"github.com/Fantom-foundation/go-lachesis/eventcheck/parentscheck"
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
 	"github.com/Fantom-foundation/go-lachesis/gossip/filters"
-	"github.com/Fantom-foundation/go-lachesis/gossip/gasprice"
-	"github.com/Fantom-foundation/go-lachesis/gossip/occuredtxs"
-	
 	"github.com/Fantom-foundation/go-lachesis/inter"
 
-	"github.com/Fantom-foundation/go-lachesis/network"
-	"github.com/Fantom-foundation/go-lachesis/network/params"
+	"github.com/Fantom-foundation/go-lachesis/benchopera"
+	"github.com/Fantom-foundation/go-lachesis/benchopera/params"
 	"github.com/Fantom-foundation/go-lachesis/logger"
 )
 
@@ -91,28 +89,20 @@ type Service struct {
 	serverPool *serverPool
 
 	// application
-	node                *node.ServiceContext
-	store               *Store
-	app                 *app.Store
-	engine              Consensus
-	engineMu            *sync.RWMutex
-	emitter             *Emitter
-	txpool              *evmcore.TxPool
-	occurredTxs         *occuredtxs.Buffer
-	heavyCheckReader    HeavyCheckReader
-	gasPowerCheckReader GasPowerCheckReader
-	checkers            *eventcheck.Checkers
-
-	// global variables. TODO refactor to pass them as arguments if possible
-	blockParticipated map[idx.StakerID]bool // validators who participated in last block
-	currentEvent      hash.Event            // current event which is being processed
+	node             *node.ServiceContext
+	store            *Store
+	engine           lachesis.Consensus
+	engineMu         *sync.RWMutex
+	emitter          *emitter.Emitter
+	heavyCheckReader HeavyCheckReader
+	checkers         *eventcheck.Checkers
 
 	feed ServiceFeed
 
 	// application protocol
 	pm *ProtocolManager
 
-	EthAPI        *EthAPIBackend
+	API           *APIBackend
 	netRPCService *ethapi.PublicNetAPI
 
 	stopped bool
@@ -120,7 +110,7 @@ type Service struct {
 	logger.Instance
 }
 
-func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine Consensus) (*Service, error) {
+func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine lachesis.Consensus) (*Service, error) {
 	svc := &Service{
 		config: config,
 
@@ -130,37 +120,16 @@ func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine C
 
 		node:  ctx,
 		store: store,
-		app:   store.app,
 
-		engineMu:          new(sync.RWMutex),
-		occurredTxs:       occuredtxs.New(txsRingBufferSize, types.NewEIP155Signer(config.Net.EvmChainConfig().ChainID)),
-		blockParticipated: make(map[idx.StakerID]bool),
+		engine:   engine,
+		engineMu: new(sync.RWMutex),
 
 		Instance: logger.MakeInstance(),
 	}
 
-	// wrap engine
-	svc.engine = &HookedEngine{
-		engine:       engine,
-		processEvent: svc.processEvent,
-	}
-	svc.engine.Bootstrap(inter.ConsensusCallbacks{
-		ApplyBlock:              svc.applyBlock,
-		SelectValidatorsGroup:   svc.selectValidatorsGroup,
-		OnEventConfirmed:        svc.onEventConfirmed,
-		IsEventAllowedIntoBlock: svc.isEventAllowedIntoBlock,
-	})
-
 	// create server pool
 	trustedNodes := []string{}
 	svc.serverPool = newServerPool(store.async.table.Peers, svc.done, &svc.wg, trustedNodes)
-
-	// create tx pool
-	stateReader := svc.GetEvmStateReader()
-	if config.TxPool.Journal != "" {
-		config.TxPool.Journal = ctx.ResolvePath(config.TxPool.Journal)
-	}
-	svc.txpool = evmcore.NewTxPool(config.TxPool, config.Net.EvmChainConfig(), stateReader)
 
 	// create checkers
 	svc.heavyCheckReader.Addrs.Store(ReadEpochPubKeys(svc.app, svc.engine.GetEpoch()))                                                                     // read pub keys of current epoch from disk
@@ -172,8 +141,7 @@ func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine C
 	svc.pm, err = NewProtocolManager(config, &svc.feed, svc.txpool, svc.engineMu, svc.checkers, store, svc.engine, svc.serverPool)
 
 	// create API backend
-	svc.EthAPI = &EthAPIBackend{config.ExtRPCEnabled, svc, stateReader, nil}
-	svc.EthAPI.gpo = gasprice.NewOracle(svc.EthAPI, svc.config.GPO)
+	svc.API = &APIBackend{config.ExtRPCEnabled, svc, stateReader, nil}
 
 	return svc, err
 }
@@ -184,31 +152,27 @@ func (s *Service) GetEngine() Consensus {
 }
 
 // makeCheckers builds event checkers
-func makeCheckers(net *network.Config, heavyCheckReader *HeavyCheckReader, gasPowerCheckReader *GasPowerCheckReader, engine Consensus, store *Store) *eventcheck.Checkers {
+func makeCheckers(net *benchopera.Config, heavyCheckReader *HeavyCheckReader, gasPowerCheckReader *GasPowerCheckReader, engine Consensus, store *Store) *eventcheck.Checkers {
 	// create signatures checker
 	ledgerID := net.EvmChainConfig().ChainID
 	heavyCheck := heavycheck.NewDefault(&net.Dag, heavyCheckReader, types.NewEIP155Signer(ledgerID))
-
-	// create gaspower checker
-	gaspowerCheck := gaspowercheck.New(gasPowerCheckReader)
 
 	return &eventcheck.Checkers{
 		Basiccheck:    basiccheck.New(&net.Dag),
 		Epochcheck:    epochcheck.New(&net.Dag, engine),
 		Parentscheck:  parentscheck.New(&net.Dag),
 		Heavycheck:    heavyCheck,
-		Gaspowercheck: gaspowerCheck,
 	}
 }
 
-func (s *Service) makeEmitter() *Emitter {
+func (s *Service) makeEmitter() *emitter.Emitter {
 	// randomize event time to decrease peak load, and increase chance of catching double instances of validator
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	emitterCfg := s.config.Emitter // copy data
 	emitterCfg.EmitIntervals = *emitterCfg.EmitIntervals.RandomizeEmitTime(r)
 
-	return NewEmitter(&s.config.Net, &emitterCfg,
-		EmitterWorld{
+	return emitter.NewEmitter(&s.config.Net, &emitterCfg,
+		emitter.EmitterWorld{
 			Am:          s.AccountManager(),
 			Engine:      s.engine,
 			EngineMu:    s.engineMu,
@@ -265,7 +229,7 @@ func (s *Service) Protocols() []p2p.Protocol {
 
 // APIs returns api methods the service wants to expose on rpc channels.
 func (s *Service) APIs() []rpc.API {
-	apis := ethapi.GetAPIs(s.EthAPI)
+	apis := ethapi.GetAPIs(s.API)
 
 	apis = append(apis, []rpc.API{
 		{
@@ -276,7 +240,7 @@ func (s *Service) APIs() []rpc.API {
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(s.EthAPI),
+			Service:   filters.NewPublicFilterAPI(s.API),
 			Public:    true,
 		}, {
 			Namespace: "net",
@@ -296,7 +260,7 @@ func (s *Service) Start(srv *p2p.Server) error {
 
 	var genesis common.Hash
 	genesis = s.engine.GetGenesisHash()
-	s.Topic = discv5.Topic("network@" + genesis.Hex())
+	s.Topic = discv5.Topic("benchopera@" + genesis.Hex())
 
 	if srv.DiscV5 != nil {
 		go func(topic discv5.Topic) {

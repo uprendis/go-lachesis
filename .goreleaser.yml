@@ -2,8 +2,8 @@ before:
   hooks:
     - make clean proto vendor
 builds:
-  - main: ./cmd/network/main.go
-    binary: go-network
+  - main: ./cmd/benchopera/main.go
+    binary: go-benchopera
     ldflags:
       - -linkmode external -extldflags -static -s -w
       - -X main.gitCommit={{ .ShortCommit }}
@@ -49,10 +49,10 @@ nfpm:
     - rpm
 
   empty_folders:
-    - /var/log/go-network
+    - /var/log/go-benchopera
 
   files:
-    "scripts/daemon/go-lachesis.service": "/lib/systemd/system/go-network.service"
+    "scripts/daemon/go-lachesis.service": "/lib/systemd/system/go-benchopera.service"
 
   # scripts:
   #   preinstall: "scripts/preinstall.bash"

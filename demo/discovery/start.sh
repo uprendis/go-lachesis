@@ -25,7 +25,7 @@ bootnode=$( "${BOOTNODE}" -nodekey bootnode.key 2>/dev/null | head -1 & )
 echo -e "Bootnode=${bootnode}"
 
 ######
-EXEC=../../build/network
+EXEC=../../build/benchopera
 
 # default ip using localhost
 IP=127.0.0.1
@@ -34,7 +34,7 @@ IP=127.0.0.1
 PORT=18540
 
 # demo directory 
-LACHESIS_BASE_DIR=/tmp/network-demo
+LACHESIS_BASE_DIR=/tmp/benchopera-demo
 
 echo -e "\nStart $N nodes:"
 for i in $(seq $N)

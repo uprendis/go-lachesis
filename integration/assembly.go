@@ -4,8 +4,10 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"github.com/Fantom-foundation/lachesis-base/hash"
+	"github.com/Fantom-foundation/lachesis-base/inter/dag"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/kvdb"
+	"github.com/Fantom-foundation/lachesis-base/utils/adapters"
 	"github.com/Fantom-foundation/lachesis-base/vector"
 
 	"github.com/Fantom-foundation/lachesis-base/abft"
@@ -25,15 +27,23 @@ func panics(name string) func(error) {
 	}
 }
 
+type GossipStoreAdapter struct {
+	*gossip.Store
+}
+
+func (g *GossipStoreAdapter) GetEvent(id hash.Event) dag.Event {
+	return g.Store.GetEvent(id)
+}
+
 // MakeEngine makes consensus engine from config.
 func MakeEngine(dataDir string, gossipCfg *gossip.Config) (*abft.Lachesis, *flushable.SyncedPool, *gossip.Store) {
 	dbs := flushable.NewSyncedPool(DBProducer(dataDir))
 
 	gdb := gossip.NewStore(dbs, gossipCfg.StoreConfig)
 
-	cMainDb := dbs.GetDb("network")
+	cMainDb := dbs.GetDb("benchopera")
 	cGetEpochDB := func(epoch idx.Epoch) kvdb.DropableStore {
-		return dbs.GetDb(fmt.Sprintf("network-%d", epoch))
+		return dbs.GetDb(fmt.Sprintf("benchopera-%d", epoch))
 	}
 	cdb := abft.NewStore(cMainDb, cGetEpochDB, panics("Lachesis store"), abft.DefaultStoreConfig())
 
@@ -71,7 +81,7 @@ func MakeEngine(dataDir string, gossipCfg *gossip.Config) (*abft.Lachesis, *flus
 
 	// create consensus
 	vecClock := vector.NewIndex(panics("Vector clock"), vector.DefaultConfig())
-	engine := abft.New(cdb, gdb, vecClock, panics("Lachesis"), abft.DefaultConfig())
+	engine := abft.NewLachesis(cdb, &GossipStoreAdapter{gdb}, &adapters.VectorToDagIndexer{vecClock}, panics("Lachesis"), abft.DefaultConfig())
 
 	return engine, dbs, gdb
 }

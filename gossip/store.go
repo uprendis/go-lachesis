@@ -3,6 +3,7 @@ package gossip
 import (
 	"bytes"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/Fantom-foundation/lachesis-base/common/bigendian"
@@ -30,14 +31,13 @@ type Store struct {
 		Version kvdb.Store `table:"_"`
 
 		// Main DAG tables
-		Events    kvdb.Store `table:"e"`
-		Blocks    kvdb.Store `table:"b"`
-		PackInfos kvdb.Store `table:"p"`
-		Packs     kvdb.Store `table:"P"`
-		PacksNum  kvdb.Store `table:"n"`
-
-		// Needed for gas power calculation
-		LastEpochHeaders kvdb.Store `table:"n"`
+		BlockState kvdb.Store `table:"d"`
+		EpochState kvdb.Store `table:"d"`
+		Events     kvdb.Store `table:"e"`
+		Blocks     kvdb.Store `table:"b"`
+		PackInfos  kvdb.Store `table:"p"`
+		Packs      kvdb.Store `table:"P"`
+		PacksNum   kvdb.Store `table:"n"`
 
 		TmpDbs kvdb.Store `table:"T"`
 	}
@@ -45,9 +45,11 @@ type Store struct {
 	EpochDbs *temporary.Dbs
 
 	cache struct {
-		Events    *lru.Cache `cache:"-"` // store by pointer
-		Blocks    *lru.Cache `cache:"-"` // store by pointer
-		PackInfos *lru.Cache `cache:"-"` // store by value
+		Events     *lru.Cache `cache:"-"` // store by pointer
+		Blocks     *lru.Cache `cache:"-"` // store by pointer
+		PackInfos  *lru.Cache `cache:"-"` // store by value
+		BlockState atomic.Value // store by pointer
+		EpochState atomic.Value // store by pointer
 	}
 
 	logger.Instance

@@ -43,13 +43,9 @@ func (e *MutableEvent) DecodeRLP(src *rlp.Stream) error {
 // MarshalBinary implements encoding.BinaryMarshaler interface.
 func (e *Event) MarshalBinary() ([]byte, error) {
 	fields64 := []uint64{
-		e.GasPowerLeft().Gas[0],
-		e.GasPowerLeft().Gas[1],
-		e.GasPowerUsed(),
 		uint64(e.RawTime()),
 	}
 	fields32 := []uint32{
-		e.Version(),
 		uint32(e.Epoch()),
 		uint32(e.Seq()),
 		uint32(e.Frame()),
@@ -63,7 +59,7 @@ func (e *Event) MarshalBinary() ([]byte, error) {
 
 	header3 := fast.NewBitArray(
 		4, // bits for storing sizes 1-8 of uint64 fields (forced to 4 because fast.BitArray)
-		uint(len(fields64)),
+		1 + uint(len(fields64)), // version + fields64
 	)
 	header2 := fast.NewBitArray(
 		2, // bits for storing sizes 1-4 of uint32 fields
@@ -87,6 +83,9 @@ func (e *Event) MarshalBinary() ([]byte, error) {
 	offset += header2.Size()
 	buf := fast.NewBuffer(raw[offset:])
 
+	// write version first
+	header3w.Push(int(e.Version()))
+
 	for _, i64 := range fields64 {
 		n := writeUintCompact(buf, i64, 8)
 		header3w.Push(n - 1)
@@ -108,7 +107,8 @@ func (e *Event) MarshalBinary() ([]byte, error) {
 	}
 
 	buf.Write(e.Payload())
-	buf.Write(e.Sig())
+	sig := e.Sig()
+	buf.Write(sig[:])
 
 	length := header3.Size() + header2.Size() + buf.Position()
 	return raw[:length], nil
@@ -136,19 +136,15 @@ func (e *MutableEvent) UnmarshalBinary(raw []byte) (err error) {
 
 	var rawTime dag.RawTimestamp
 	fields64 := []*uint64{
-		&e.gasPowerLeft.Gas[0],
-		&e.gasPowerLeft.Gas[1],
-		&e.gasPowerUsed,
 		(*uint64)(&rawTime),
 	}
 	var epoch idx.Epoch
 	var seq idx.Event
 	var frame idx.Frame
-	var creator idx.StakerID
+	var creator idx.ValidatorID
 	var lamport idx.Lamport
 	var parentsCount uint32
 	fields32 := []*uint32{
-		&e.version,
 		(*uint32)(&epoch),
 		(*uint32)(&seq),
 		(*uint32)(&frame),
@@ -163,7 +159,7 @@ func (e *MutableEvent) UnmarshalBinary(raw []byte) (err error) {
 
 	header3 := fast.NewBitArray(
 		4, // bits for storing sizes 1-8 of uint64 fields (forced to 4 because fast.BitArray)
-		uint(len(fields64)),
+		1 + uint(len(fields64)), // version + fields64
 	)
 	header2 := fast.NewBitArray(
 		2, // bits for storing sizes 1-4 of uint32 fields
@@ -177,6 +173,12 @@ func (e *MutableEvent) UnmarshalBinary(raw []byte) (err error) {
 	offset += header2.Size()
 	raw = raw[offset:]
 	buf := fast.NewBuffer(raw)
+
+	// read version first
+	ver := header3r.Pop()
+	if ver != 0 {
+		return errors.New("wrong version")
+	}
 
 	for _, i64 := range fields64 {
 		n := header3r.Pop() + 1
@@ -205,13 +207,14 @@ func (e *MutableEvent) UnmarshalBinary(raw []byte) (err error) {
 		copy(parents[i][4:], buf.Read(common.HashLength-4)) // without epoch
 	}
 
-	sigSize := 65
-	if len(raw)-buf.Position() < sigSize {
+	if len(raw)-buf.Position() < SigSize {
 		return errors.New("malformed signature")
 	}
-	e.payload = buf.Read(len(raw) - buf.Position() - sigSize)
-	e.sig = buf.Read(sigSize)
+	e.payload = buf.Read(len(raw) - buf.Position() - SigSize)
+	sig := buf.Read(SigSize)
+	copy(e.sig[:], sig)
 
+	e.SetVersion(uint8(ver))
 	e.SetRawTime(rawTime)
 	e.SetEpoch(epoch)
 	e.SetSeq(seq)

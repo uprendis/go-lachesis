@@ -14,4 +14,4 @@ done
 
 blockade destroy 2> /dev/null # fine if not found
 
-docker network rm ${NETWORK} 2> /dev/null # fine if no network
+docker benchopera rm ${NETWORK} 2> /dev/null # fine if no benchopera

@@ -13,7 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/params"
 
-	"github.com/Fantom-foundation/go-lachesis/network/genesis"
+	"github.com/Fantom-foundation/go-lachesis/benchopera/genesis"
 )
 
 const (
@@ -24,7 +24,7 @@ const (
 // Tests that a node embedded within a console can be started up properly and
 // then terminated by closing the input stream.
 func TestConsoleWelcome(t *testing.T) {
-	// Start a network console, make sure it's cleaned up and terminate the console
+	// Start a benchopera console, make sure it's cleaned up and terminate the console
 	cli := exec(t,
 		"--port", "0", "--maxpeers", "0", "--nodiscover", "--nat", "none",
 		"console")
@@ -41,7 +41,7 @@ func TestConsoleWelcome(t *testing.T) {
 	cli.Expect(`
 Welcome to the Lachesis JavaScript console!
 
-instance: go-network/v{{version}}/{{goos}}-{{goarch}}/{{gover}}
+instance: go-benchopera/v{{version}}/{{goos}}-{{goarch}}/{{gover}}
 coinbase: {{.Coinbase}}
 at block: 0 ({{niltime}})
  datadir: {{.Datadir}}
@@ -61,7 +61,7 @@ func TestIPCAttachWelcome(t *testing.T) {
 	} else {
 		ws := tmpdir(t)
 		defer os.RemoveAll(ws)
-		ipc = filepath.Join(ws, "network.ipc")
+		ipc = filepath.Join(ws, "benchopera.ipc")
 	}
 	cli := exec(t,
 		"--port", "0", "--maxpeers", "0", "--nodiscover", "--nat", "none",
@@ -104,7 +104,7 @@ func TestWSAttachWelcome(t *testing.T) {
 }
 
 func testAttachWelcome(t *testing.T, cli *testcli, endpoint, apis string) {
-	// Attach to a running network node and terminate immediately
+	// Attach to a running benchopera node and terminate immediately
 	attach := exec(t, "attach", endpoint)
 
 	// Gather all the infos the welcome message needs to contain
@@ -122,7 +122,7 @@ func testAttachWelcome(t *testing.T, cli *testcli, endpoint, apis string) {
 	attach.Expect(`
 Welcome to the Lachesis JavaScript console!
 
-instance: go-network/v{{version}}/{{goos}}-{{goarch}}/{{gover}}
+instance: go-benchopera/v{{version}}/{{goos}}-{{goarch}}/{{gover}}
 coinbase: {{coinbase}}
 at block: 0 ({{niltime}}){{if ipc}}
  datadir: {{datadir}}{{end}}
@@ -134,7 +134,7 @@ at block: 0 ({{niltime}}){{if ipc}}
 }
 
 // trulyRandInt generates a crypto random integer used by the console tests to
-// not clash network ports with other tests running cocurrently.
+// not clash benchopera ports with other tests running cocurrently.
 func trulyRandInt(lo, hi int) int {
 	num, _ := rand.Int(rand.Reader, big.NewInt(int64(hi-lo)))
 	return int(num.Int64()) + lo

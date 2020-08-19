@@ -11,5 +11,5 @@ func (s *Store) Migrate() error {
 
 func (s *Store) migrations() *migration.Migration {
 	return migration.
-		Begin("network-gossip-store")
+		Begin("benchopera-gossip-store")
 }

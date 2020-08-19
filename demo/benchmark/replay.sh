@@ -11,8 +11,8 @@ LIMIT_CPU=$(echo "scale=2; 1/$N" | bc)
 LIMIT_IO=$(echo "500/$N" | bc)
 
 #
-PROG=network
-EXEC=../../build/network
+PROG=benchopera
+EXEC=../../build/benchopera
 
 # default ip using localhost
 IP=127.0.0.1
@@ -20,7 +20,7 @@ IP=127.0.0.1
 # the actual ports are PORT+1, PORT+2, etc (18541, 18542, 18543, ... )
 PORT=18540
 
-LACHESIS_BASE_DIR=/tmp/network-demo-replay/datadir
+LACHESIS_BASE_DIR=/tmp/benchopera-demo-replay/datadir
 rm -rf ${LACHESIS_BASE_DIR} > /dev/null
 mkdir ${LACHESIS_BASE_DIR}
 

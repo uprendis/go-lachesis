@@ -12,7 +12,7 @@ global:
 scrape_configs:
 HEADER
 
-docker ps -f network=${NETWORK} --format '{{.Names}}' | while read svc
+docker ps -f benchopera=${NETWORK} --format '{{.Names}}' | while read svc
 do
     cat << NODE >> $CONF
   - job_name: '$svc'

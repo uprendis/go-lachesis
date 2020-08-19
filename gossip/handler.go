@@ -74,9 +74,9 @@ type ProtocolManager struct {
 	fetcher    *fetcher.Fetcher
 	buffer     *ordering.EventBuffer
 
-	store    *Store
-	engine   Consensus
-	engineMu *sync.RWMutex
+	store        *Store
+	processEvent func(*inter.Event) error
+	engineMu     *sync.RWMutex
 
 	notifier         dagNotifier
 	emittedEventsCh  chan *inter.Event
@@ -101,14 +101,14 @@ type ProtocolManager struct {
 }
 
 // NewProtocolManager returns a new Fantom sub protocol manager. The Fantom sub protocol manages peers capable
-// with the Fantom network.
+// with the Fantom benchopera.
 func NewProtocolManager(
 	config *Config,
 	notifier dagNotifier,
 	engineMu *sync.RWMutex,
 	checkers *eventcheck.Checkers,
 	s *Store,
-	engine Consensus,
+	processEvent func(*inter.Event) error,
 	serverPool *serverPool,
 ) (
 	*ProtocolManager,
@@ -116,17 +116,17 @@ func NewProtocolManager(
 ) {
 	// Create the protocol manager with the base fields
 	pm := &ProtocolManager{
-		config:      config,
-		notifier:    notifier,
-		store:       s,
-		engine:      engine,
-		peers:       newPeerSet(),
-		serverPool:  serverPool,
-		engineMu:    engineMu,
-		newPeerCh:   make(chan *peer),
-		noMorePeers: make(chan struct{}),
-		txsyncCh:    make(chan *txsync),
-		quitSync:    make(chan struct{}),
+		config:       config,
+		notifier:     notifier,
+		store:        s,
+		processEvent: processEvent,
+		peers:        newPeerSet(),
+		serverPool:   serverPool,
+		engineMu:     engineMu,
+		newPeerCh:    make(chan *peer),
+		noMorePeers:  make(chan struct{}),
+		txsyncCh:     make(chan *txsync),
+		quitSync:     make(chan struct{}),
 
 		Instance: logger.MakeInstance(),
 	}
@@ -159,7 +159,7 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 		}
 		return nil
 	}
-	bufferedCheck := func(e dag.Event, parents []dag.Event) error {
+	bufferedCheck := func(e dag.Event, parents dag.Events) error {
 		var selfParent dag.Event
 		if e.SelfParent() != nil {
 			selfParent = parents[0]
@@ -183,7 +183,7 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 			defer pm.engineMu.Unlock()
 
 			start := time.Now()
-			err := pm.engine.ProcessEvent(e)
+			err := pm.processEvent(e)
 			if err != nil {
 				return err
 			}
@@ -245,7 +245,7 @@ func (pm *ProtocolManager) onlyInterestedEvents(ids hash.Events) hash.Events {
 	if len(ids) == 0 {
 		return ids
 	}
-	epoch := pm.engine.GetEpoch()
+	epoch := pm.store.GetEpoch()
 
 	interested := make(hash.Events, 0, len(ids))
 	for _, id := range ids {
@@ -844,7 +844,7 @@ func (pm *ProtocolManager) onNewEpochLoop() {
 // NodeInfo represents a short summary of the sub-protocol metadata
 // known about the host peer.
 type NodeInfo struct {
-	Network     uint64      `json:"network"` // network ID
+	Network     uint64      `json:"benchopera"` // benchopera ID
 	Genesis     common.Hash `json:"genesis"` // SHA3 hash of the host's genesis object
 	Epoch       idx.Epoch   `json:"epoch"`
 	NumOfBlocks idx.Block   `json:"blocks"`

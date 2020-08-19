@@ -1,6 +1,7 @@
 package genesis
 
 import (
+	"crypto/sha256"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/inter/pos"
 	"github.com/ethereum/go-ethereum/common"
@@ -10,19 +11,19 @@ import (
 type (
 	// Validator is a helper structure to define genesis validators
 	Validator struct {
-		ID      idx.StakerID
-		Address common.Address
+		ID      idx.ValidatorID
+		PubKey  []byte
 		Stake   *big.Int
 	}
 
 	Validators []Validator
 )
 
-// Validators converts Validators to Validators
-func (gv Validators) Validators() *pos.Validators {
+// Build converts Validators to Validators
+func (gv Validators) Build() *pos.Validators {
 	builder := pos.NewBuilder()
 	for _, validator := range gv {
-		builder.Set(validator.ID, pos.Stake(validator.Stake.Uint64()))
+		builder.Set(validator.ID, pos.Weight(validator.Stake.Uint64()))
 	}
 	return builder.Build()
 }
@@ -37,8 +38,8 @@ func (gv Validators) TotalStake() *big.Int {
 }
 
 // Map converts Validators to map
-func (gv Validators) Map() map[idx.StakerID]Validator {
-	validators := map[idx.StakerID]Validator{}
+func (gv Validators) Map() map[idx.ValidatorID]Validator {
+	validators := map[idx.ValidatorID]Validator{}
 	for _, validator := range gv {
 		validators[validator.ID] = validator
 	}
@@ -46,10 +47,22 @@ func (gv Validators) Map() map[idx.StakerID]Validator {
 }
 
 // Addresses returns not sorted genesis addresses
-func (gv Validators) Addresses() []common.Address {
-	res := make([]common.Address, 0, len(gv))
+func (gv Validators) PubKeys() [][]byte {
+	res := make([][]byte, 0, len(gv))
 	for _, v := range gv {
-		res = append(res, v.Address)
+		res = append(res, v.PubKey)
 	}
 	return res
+}
+
+// Hash returns data digest
+func (gv Validators) Hash() common.Hash {
+	hasher := sha256.New()
+	for _, v := range gv {
+		hasher.Write(v.ID.Bytes())
+		hasher.Write(v.PubKey)
+		hasher.Write([]byte{uint8((len(v.Stake.Bytes())))})
+		hasher.Write(v.Stake.Bytes())
+	}
+	return common.BytesToHash(hasher.Sum(nil))
 }

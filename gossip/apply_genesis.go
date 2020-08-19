@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/lachesis-base/hash"
+	"github.com/Fantom-foundation/lachesis-base/inter/dag"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
-	"math/big"
-
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/Fantom-foundation/go-lachesis/network"
+	"github.com/Fantom-foundation/go-lachesis/benchopera"
 )
 
 // GenesisMismatchError is raised when trying to overwrite an existing
@@ -24,7 +23,7 @@ func (e *GenesisMismatchError) Error() string {
 }
 
 // ApplyGenesis writes initial state.
-func (s *Store) ApplyGenesis(net *network.Config) (genesisAtropos hash.Event, genesisState common.Hash, new bool, err error) {
+func (s *Store) ApplyGenesis(net *benchopera.Config) (genesisAtropos hash.Event, genesisState common.Hash, new bool, err error) {
 	storedGenesis := s.GetBlock(0)
 	if storedGenesis != nil {
 		newHash := calcGenesisHash(net)
@@ -46,7 +45,7 @@ func (s *Store) ApplyGenesis(net *network.Config) (genesisAtropos hash.Event, ge
 }
 
 // calcGenesisHash calcs hash of genesis state.
-func calcGenesisHash(net *network.Config) hash.Event {
+func calcGenesisHash(net *benchopera.Config) hash.Event {
 	s := NewMemStore()
 	defer s.Close()
 
@@ -55,24 +54,18 @@ func calcGenesisHash(net *network.Config) hash.Event {
 	return h
 }
 
-func (s *Store) applyGenesis(net *network.Config) (genesisAtropos hash.Event, genesisState common.Hash, err error) {
-	// apply app genesis
-	state, err := s.app.ApplyGenesis(net)
-	if err != nil {
-		return genesisAtropos, genesisState, err
-	}
-
-	prettyHash := func(net *network.Config) hash.Event {
-		e := inter.NewEvent()
+func (s *Store) applyGenesis(net *benchopera.Config) (genesisAtropos hash.Event, genesisState common.Hash, err error) {
+	prettyHash := func(net *benchopera.Config) hash.Event {
+		e := inter.MutableEvent{}
 		// for nice-looking ID
-		e.Epoch = 0
-		e.Lamport = idx.Lamport(net.Dag.MaxEpochBlocks)
+		e.SetEpoch(0)
+		e.SetLamport(idx.Lamport(net.Dag.MaxEpochBlocks))
 		// actual data hashed
-		e.Extra = net.Genesis.ExtraData
-		e.ClaimedTime = net.Genesis.Time
-		e.TxHash = net.Genesis.Alloc.Accounts.Hash()
+		h := net.Genesis.Validators.Hash()
+		e.SetPayload(append(net.Genesis.ExtraData, h[:]...))
+		e.SetRawTime(dag.RawTimestamp(net.Genesis.Time))
 
-		return e.CalcHash()
+		return e.Build().ID()
 	}
 	genesisAtropos = prettyHash(net)
 	genesisState = common.Hash(genesisAtropos)

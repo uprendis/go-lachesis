@@ -13,7 +13,7 @@ const (
 )
 
 // protocolName is the official short name of the protocol used during capability negotiation.
-const protocolName = "network"
+const protocolName = "benchopera"
 
 // ProtocolVersions are the supported versions of the protocol (first is primary).
 var ProtocolVersions = []uint{lachesis62}
@@ -27,7 +27,7 @@ const protocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a prot
 const (
 	StatusMsg = 0x00
 
-	// Protocol messages belonging to network/62
+	// Protocol messages belonging to benchopera/62
 
 	// Signals about the current synchronization status.
 	// The current peer's status is used during packs downloading,
@@ -89,7 +89,7 @@ var errorToString = map[int]string{
 	ErrEmptyMessage:            "Empty message",
 }
 
-// statusData is the network packet for the status message. It's used for compatibility with some ETH wallets.
+// statusData is the benchopera packet for the status message. It's used for compatibility with some ETH wallets.
 type statusData struct {
 	ProtocolVersion   uint32
 	NetworkID         uint64

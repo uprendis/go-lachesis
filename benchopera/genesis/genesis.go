@@ -21,6 +21,6 @@ func FakeGenesis(accs Validators) Genesis {
 	return Genesis{
 		Validators: accs,
 		Time:       genesisTime,
-		ExtraData:  []byte("experimental network"),
+		ExtraData:  []byte("experimental benchopera"),
 	}
 }

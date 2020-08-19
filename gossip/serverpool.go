@@ -730,7 +730,7 @@ func (e *knownEntry) Weight() int64 {
 }
 
 // poolEntryAddress is a separate object because currently it is necessary to remember
-// multiple potential network addresses for a pool entry. This will be removed after
+// multiple potential benchopera addresses for a pool entry. This will be removed after
 // the final implementation of v5 discovery which will retrieve signed and serial
 // numbered advertisements, making it clear which IP/port is the latest one.
 type poolEntryAddress struct {

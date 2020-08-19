@@ -28,7 +28,7 @@ done
 #rm -f prometheus.yml
 
 docker $SWARM service create \
-  --network network \
+  --benchopera benchopera \
   --hostname="{{.Service.Name}}" \
   --name prometheus \
   --config src=prometheus,target=/etc/prometheus/prometheus.yml \

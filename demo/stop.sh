@@ -1,9 +1,9 @@
 #!/bin/bash
 
-PROG=network
+PROG=benchopera
 
-# kill all network processes
+# kill all benchopera processes
 pkill "${PROG}"
 
 # remove demo data
-rm -rf /tmp/network-demo/datadir/
+rm -rf /tmp/benchopera-demo/datadir/

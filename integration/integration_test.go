@@ -17,8 +17,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/simulations/adapters"
 
 	"github.com/Fantom-foundation/go-lachesis/inter/pos"
-	"github.com/Fantom-foundation/go-lachesis/network"
-	"github.com/Fantom-foundation/go-lachesis/network/genesis"
+	"github.com/Fantom-foundation/go-lachesis/benchopera"
+	"github.com/Fantom-foundation/go-lachesis/benchopera/genesis"
 )
 
 type topology func(net *simulations.Network, nodes []enode.ID)
@@ -42,7 +42,7 @@ func testSim(t *testing.T, connect topology) {
 		log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
 
 	// fake net
-	network := network.FakeNetConfig(genesis.FakeValidators(count, big.NewInt(0), pos.StakeToBalance(10000)))
+	network := benchopera.FakeNetConfig(genesis.FakeValidators(count, big.NewInt(0), pos.WeightToBalance(10000)))
 
 	// register a single gossip service
 	services := map[string]adapters.ServiceFunc{
@@ -59,7 +59,7 @@ func testSim(t *testing.T, connect topology) {
 	var adapter adapters.NodeAdapter
 	adapter = adapters.NewSimAdapter(services)
 
-	// create network
+	// create benchopera
 	sim := simulations.NewNetwork(adapter, &simulations.NetworkConfig{
 		DefaultService: serviceNames(services)[0],
 	})

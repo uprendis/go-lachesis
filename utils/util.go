@@ -67,7 +67,7 @@ func HashFromHex(s string) []byte {
 	return h
 }
 
-// FreePort gets free network port on host.
+// FreePort gets free benchopera port on host.
 func FreePort(network string) (port uint16) {
 	addr, err := net.ResolveTCPAddr(network, "localhost:0")
 	if err != nil {
@@ -118,7 +118,7 @@ func PaddedBigBytes(bigint *big.Int, n int) []byte {
 }
 
 // NameOf returns human readable string representation.
-func NameOf(p idx.StakerID) string {
+func NameOf(p idx.ValidatorID) string {
 	if name := hash.GetNodeName(p); len(name) > 0 {
 		return name
 	}

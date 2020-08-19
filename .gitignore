@@ -33,7 +33,7 @@ glide.lock
 *.tgz
 *.zip
 
-# network project specific
+# benchopera project specific
 scripts/certs
 scripts/nodes
 scripts/peers.json

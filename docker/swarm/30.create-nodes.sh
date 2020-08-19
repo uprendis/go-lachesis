@@ -2,8 +2,8 @@
 cd $(dirname $0)
 . ./_params.sh
 
-docker $SWARM network inspect network &>/dev/null || \
-docker $SWARM network create --driver overlay network
+docker $SWARM benchopera inspect benchopera &>/dev/null || \
+docker $SWARM benchopera create --driver overlay benchopera
 
 
 bootnode=""
@@ -19,7 +19,7 @@ do
 
   docker $SWARM service inspect ${NAME} &>/dev/null || \
   docker $SWARM service create \
-    --network network \
+    --benchopera benchopera \
     --hostname="{{.Service.Name}}" \
     --name ${NAME} \
     --publish ${PORT}:${PORT}/tcp \
@@ -32,7 +32,7 @@ do
     --replicas 1 \
     --with-registry-auth \
     --detach=false \
-   ${REGISTRY_HOST}/network:${TAG} --nousb \
+   ${REGISTRY_HOST}/benchopera:${TAG} --nousb \
     --fakenet=$ACC/$N,/tmp/test_accs.json \
     --port=${PORT} --nat="extip:${SWARM_HOST}" \
     --rpc --rpcaddr="0.0.0.0" --rpcport=${RPCP} --rpcvhosts="*" --rpccorsdomain="*" --rpcapi="eth,debug,admin,web3,personal,net,txpool,ftm,sfc" \

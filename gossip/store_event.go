@@ -14,8 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-// DeleteEvent deletes event.
-func (s *Store) DeleteEvent(id hash.Event) {
+// DelEvent deletes event.
+func (s *Store) DelEvent(id hash.Event) {
 	key := id.Bytes()
 
 	err := s.table.Events.Delete(key)

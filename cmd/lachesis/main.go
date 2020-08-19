@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	// clientIdentifier to advertise over the network.
-	clientIdentifier = "go-network"
+	// clientIdentifier to advertise over the benchopera.
+	clientIdentifier = "go-benchopera"
 )
 
 var (
@@ -37,7 +37,7 @@ var (
 	gitCommit = ""
 	gitDate   = ""
 	// The app that holds all commands and flags.
-	app = utils.NewApp(gitCommit, gitDate, "the go-network command line interface")
+	app = utils.NewApp(gitCommit, gitDate, "the go-benchopera command line interface")
 
 	testFlags    []cli.Flag
 	nodeFlags    []cli.Flag
@@ -200,7 +200,7 @@ func main() {
 	}
 }
 
-// network is the main entry point into the system if no special subcommand is ran.
+// benchopera is the main entry point into the system if no special subcommand is ran.
 // It creates a default node based on the command line arguments and runs it in
 // blocking mode, waiting for it to be shut down.
 func lachesisMain(ctx *cli.Context) error {
@@ -239,7 +239,7 @@ func makeNode(ctx *cli.Context, cfg *config) *node.Node {
 	}
 	setValidator(ctx, ks, &cfg.Lachesis.Emitter)
 
-	// Create and register a gossip network service. This is done through the definition
+	// Create and register a gossip benchopera service. This is done through the definition
 	// of a node.ServiceConstructor that will instantiate a node.Service. The reason for
 	// the factory method approach is to support service restarts without relying on the
 	// individual implementations' support for such operations.
@@ -280,7 +280,7 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	events := make(chan accounts.WalletEvent, 16)
 	stack.AccountManager().Subscribe(events)
 
-	// Create a client to interact with local network node.
+	// Create a client to interact with local benchopera node.
 	rpcClient, err := stack.Attach()
 	if err != nil {
 		utils.Fatalf("Failed to attach to self: %v", err)

@@ -6,7 +6,7 @@ import (
 
 func overrideParams() {
 	// DiscoveryV5Bootnodes are the enode URLs of the P2P bootstrap nodes for the
-	// experimental RLPx v5 topic-discovery network.
+	// experimental RLPx v5 topic-discovery benchopera.
 	params.DiscoveryV5Bootnodes = []string{
 		// mainnet
 		"enode://a2941866e485442aa6b17d67d77f8a6c4580bb556894cc1618473eff1e18203d8cce50b563cf4c75e408886079b8f067069442ed52e2ac9e556baa3f8fcc525f@3.24.15.66:5050",
@@ -20,11 +20,11 @@ func overrideParams() {
 	}
 
 	// MainnetBootnodes are the enode URLs of the discovery V4 P2P bootstrap nodes running on
-	// the main Opera network.
+	// the main Opera benchopera.
 	params.MainnetBootnodes = []string{}
 
 	// TestnetBootnodes are the enode URLs of the discovery V4 P2P bootstrap nodes running on
-	//  the test Opera network.
+	//  the test Opera benchopera.
 	params.TestnetBootnodes = []string{}
 
 	params.RinkebyBootnodes = []string{}

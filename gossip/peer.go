@@ -298,7 +298,7 @@ func (p *peer) RequestPack(epoch idx.Epoch, index idx.Pack) error {
 }
 
 // Handshake executes the protocol handshake, negotiating version number,
-// network IDs, difficulties, head and genesis object.
+// benchopera IDs, difficulties, head and genesis object.
 func (p *peer) Handshake(network uint64, progress PeerProgress, genesis common.Hash) error {
 	// Send out own handshake in a new thread
 	errc := make(chan error, 2)
@@ -369,7 +369,7 @@ func (p *peer) readStatus(network uint64, status *statusData, genesis common.Has
 // String implements fmt.Stringer.
 func (p *peer) String() string {
 	return fmt.Sprintf("Peer %s [%s]", p.id,
-		fmt.Sprintf("network/%2d", p.version),
+		fmt.Sprintf("benchopera/%2d", p.version),
 	)
 }
 

@@ -12,7 +12,7 @@ i=3
 
   docker $SWARM service update ${NAME} \
     --stop-grace-period 10s \
-    --image ${REGISTRY_HOST}/network:${TAG} \
+    --image ${REGISTRY_HOST}/benchopera:${TAG} \
     --with-registry-auth \
     --detach=false
 

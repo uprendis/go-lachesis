@@ -18,7 +18,7 @@ func CheckPid(pidfileName string) error {
 		}
 		err = process.Signal(syscall.Signal(0))
 		if err == nil {
-			return fmt.Errorf("perhaps another network is already running with pid %d", pid)
+			return fmt.Errorf("perhaps another benchopera is already running with pid %d", pid)
 		}
 	}
 

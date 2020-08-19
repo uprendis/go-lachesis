@@ -61,4 +61,4 @@ replace gopkg.in/urfave/cli.v1 => github.com/urfave/cli v1.20.0
 
 replace github.com/ethereum/go-ethereum => github.com/Fantom-foundation/go-ethereum v1.9.8-ftm-0.10
 
-replace github.com/Fantom-foundation/lachesis-base => github.com/uprendis/lachesis-base v0.0.0-20200818063954-71d11a1d3754
+replace github.com/Fantom-foundation/lachesis-base => github.com/uprendis/lachesis-base v0.0.0-20200819100452-aeed0ea1c18d

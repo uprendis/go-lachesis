@@ -15,7 +15,7 @@ import (
 
 	"github.com/Fantom-foundation/go-lachesis/crypto"
 	"github.com/Fantom-foundation/go-lachesis/integration"
-	"github.com/Fantom-foundation/go-lachesis/network/genesis"
+	"github.com/Fantom-foundation/go-lachesis/benchopera/genesis"
 	"github.com/Fantom-foundation/go-lachesis/utils"
 )
 

@@ -21,7 +21,7 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
 	"github.com/Fantom-foundation/go-lachesis/gossip"
 	"github.com/Fantom-foundation/go-lachesis/gossip/gasprice"
-	"github.com/Fantom-foundation/go-lachesis/network"
+	"github.com/Fantom-foundation/go-lachesis/benchopera"
 )
 
 var (
@@ -88,13 +88,13 @@ func loadAllConfigs(file string, cfg *config) error {
 	if err != nil {
 		return errors.New(fmt.Sprintf("TOML config file error: %v.\n"+
 			"Use 'dumpconfig' command to get an example config file.\n"+
-			"If node was recently upgraded and a previous network config file is used, then check updates for the config file.", err))
+			"If node was recently upgraded and a previous benchopera config file is used, then check updates for the config file.", err))
 	}
 	return err
 }
 
-func defaultLachesisConfig(ctx *cli.Context) network.Config {
-	var cfg network.Config
+func defaultLachesisConfig(ctx *cli.Context) benchopera.Config {
+	var cfg benchopera.Config
 
 	switch {
 	case ctx.GlobalIsSet(FakeNetFlag.Name):
@@ -102,11 +102,11 @@ func defaultLachesisConfig(ctx *cli.Context) network.Config {
 		if err != nil {
 			log.Crit("Invalid flag", "flag", FakeNetFlag.Name, "err", err)
 		}
-		cfg = network.FakeNetConfig(accs)
+		cfg = benchopera.FakeNetConfig(accs)
 	case ctx.GlobalBool(utils.TestnetFlag.Name):
-		cfg = network.TestNetConfig()
+		cfg = benchopera.TestNetConfig()
 	default:
-		cfg = network.MainNetConfig()
+		cfg = benchopera.MainNetConfig()
 	}
 
 	return cfg
@@ -189,7 +189,7 @@ func setTxPool(ctx *cli.Context, cfg *evmcore.TxPoolConfig) {
 func gossipConfigWithFlags(ctx *cli.Context, src gossip.Config) gossip.Config {
 	cfg := src
 
-	// Avoid conflicting network flags
+	// Avoid conflicting benchopera flags
 	utils.CheckExclusive(ctx, FakeNetFlag, utils.DeveloperFlag, utils.TestnetFlag)
 	utils.CheckExclusive(ctx, FakeNetFlag, utils.DeveloperFlag, utils.ExternalSignerFlag) // Can't use both ephemeral unlocked and external signer
 
@@ -259,7 +259,7 @@ func defaultNodeConfig() node.Config {
 	cfg.Version = params.VersionWithCommit(gitCommit, gitDate)
 	cfg.HTTPModules = append(cfg.HTTPModules, "eth", "ftm", "sfc", "web3")
 	cfg.WSModules = append(cfg.WSModules, "eth", "ftm", "sfc", "web3")
-	cfg.IPCPath = "network.ipc"
+	cfg.IPCPath = "benchopera.ipc"
 	cfg.DataDir = DefaultDataDir()
 	return cfg
 }

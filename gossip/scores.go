@@ -61,35 +61,35 @@ func (s *Service) updateValidationScores(block *inter.Block, sealEpoch bool) {
 	blockTimeDiff := block.Time - s.store.GetBlock(block.Index-1).Time
 
 	// Calc validation scores
-	for _, it := range s.GetActiveSfcStakers() {
+	for _, it := range s.GetActiveSfcValidators() {
 		// validators only
-		if !s.engine.GetValidators().Exists(it.StakerID) {
+		if !s.engine.GetValidators().Exists(it.ValidatorID) {
 			continue
 		}
 
 		// Check if validator has confirmed events by this Atropos
-		missedBlock := !s.blockParticipated[it.StakerID]
+		missedBlock := !s.blockParticipated[it.ValidatorID]
 
 		// If have no confirmed events by this Atropos - just add missed blocks for validator
 		if missedBlock {
-			s.app.IncBlocksMissed(it.StakerID, blockTimeDiff)
+			s.app.IncBlocksMissed(it.ValidatorID, blockTimeDiff)
 			continue
 		}
 
-		missedNum := s.app.GetBlocksMissed(it.StakerID).Num
+		missedNum := s.app.GetBlocksMissed(it.ValidatorID).Num
 		if missedNum > s.config.Net.Economy.BlockMissedLatency {
 			missedNum = s.config.Net.Economy.BlockMissedLatency
 		}
 
 		// Add score for previous blocks, but no more than FrameLatency prev blocks
-		s.app.AddDirtyValidationScore(it.StakerID, new(big.Int).SetUint64(uint64(blockTimeDiff)))
+		s.app.AddDirtyValidationScore(it.ValidatorID, new(big.Int).SetUint64(uint64(blockTimeDiff)))
 		for i := idx.Block(1); i <= missedNum && i < block.Index; i++ {
 			blockTime := s.store.GetBlock(block.Index - i).Time
 			prevBlockTime := s.store.GetBlock(block.Index - i - 1).Time
 			timeDiff := blockTime - prevBlockTime
-			s.app.AddDirtyValidationScore(it.StakerID, new(big.Int).SetUint64(uint64(timeDiff)))
+			s.app.AddDirtyValidationScore(it.ValidatorID, new(big.Int).SetUint64(uint64(timeDiff)))
 		}
-		s.app.ResetBlocksMissed(it.StakerID)
+		s.app.ResetBlocksMissed(it.ValidatorID)
 	}
 
 	if sealEpoch {

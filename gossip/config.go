@@ -1,12 +1,8 @@
 package gossip
 
 import (
-	"math/big"
-
-	"github.com/Fantom-foundation/go-lachesis/evmcore"
-	"github.com/Fantom-foundation/go-lachesis/gossip/gasprice"
-	"github.com/Fantom-foundation/go-lachesis/network"
-	"github.com/Fantom-foundation/go-lachesis/network/params"
+	"github.com/Fantom-foundation/go-lachesis/benchopera"
+	"github.com/Fantom-foundation/go-lachesis/gossip/emitter"
 )
 
 type (
@@ -19,34 +15,12 @@ type (
 	}
 	// Config for the gossip service.
 	Config struct {
-		Net     network.Config
-		Emitter EmitterConfig
-		TxPool  evmcore.TxPoolConfig
+		Net     benchopera.Config
+		Emitter emitter.Config
 		StoreConfig
-
-		TxIndex             bool // Whether to enable indexing transactions and receipts or not
-		DecisiveEventsIndex bool // Whether to enable indexing events which decide blocks or not
-		EventLocalTimeIndex bool // Whether to enable indexing arrival time of events or not
 
 		// Protocol options
 		Protocol ProtocolConfig
-
-		// Gas Price Oracle options
-		GPO gasprice.Config
-
-		// Enables tracking of SHA3 preimages in the VM
-		EnablePreimageRecording bool // TODO
-
-		// Type of the EWASM interpreter ("" for default)
-		EWASMInterpreter string
-
-		// Type of the EVM interpreter ("" for default)
-		EVMInterpreter string // TODO custom interpreter
-
-		// RPCGasCap is the global gas cap for eth-call variants.
-		RPCGasCap *big.Int `toml:",omitempty"`
-
-		ExtRPCEnabled bool
 	}
 
 	// StoreConfig is a config for store db.
@@ -61,36 +35,26 @@ type (
 )
 
 // DefaultConfig returns the default configurations for the gossip service.
-func DefaultConfig(network network.Config) Config {
+func DefaultConfig(network benchopera.Config) Config {
 	cfg := Config{
 		Net:         network,
-		Emitter:     DefaultEmitterConfig(),
-		TxPool:      evmcore.DefaultTxPoolConfig(),
+		Emitter:     emitter.DefaultEmitterConfig(),
 		StoreConfig: DefaultStoreConfig(),
-
-		TxIndex:             true,
-		DecisiveEventsIndex: false,
 
 		Protocol: ProtocolConfig{
 			LatencyImportance:    60,
 			ThroughputImportance: 40,
 		},
-
-		GPO: gasprice.Config{
-			Blocks:     20,
-			Percentile: 60,
-			Default:    params.MinGasPrice,
-		},
 	}
 
-	if network.NetworkID == network.FakeNetworkID {
-		cfg.Emitter = FakeEmitterConfig()
+	if network.NetworkID == benchopera.FakeNetworkID {
+		cfg.Emitter = emitter.FakeEmitterConfig()
 		// disable self-fork protection if fakenet 1/1
-		if len(network.Genesis.Alloc.Validators) == 1 {
+		if len(network.Genesis.Validators) == 1 {
 			cfg.Emitter.EmitIntervals.SelfForkProtection = 0
 		}
 	}
-	/*if network.NetworkId == network.DevNetworkId { // TODO dev network
+	/*if benchopera.NetworkId == benchopera.DevNetworkId { // TODO dev benchopera
 		cfg.TxPool = evmcore.FakeTxPoolConfig()
 		cfg.Emitter = FakeEmitterConfig()
 	}*/
@@ -102,11 +66,8 @@ func DefaultConfig(network network.Config) Config {
 func DefaultStoreConfig() StoreConfig {
 	return StoreConfig{
 		EventsCacheSize:        500,
-		EventsHeadersCacheSize: 10000,
 		BlockCacheSize:         100,
 		PackInfosCacheSize:     100,
-		TxPositionsCacheSize:   1000,
-		EpochStatsCacheSize:    100,
 	}
 }
 
@@ -114,10 +75,7 @@ func DefaultStoreConfig() StoreConfig {
 func LiteStoreConfig() StoreConfig {
 	return StoreConfig{
 		EventsCacheSize:        100,
-		EventsHeadersCacheSize: 1000,
 		BlockCacheSize:         100,
 		PackInfosCacheSize:     100,
-		TxPositionsCacheSize:   100,
-		EpochStatsCacheSize:    100,
 	}
 }

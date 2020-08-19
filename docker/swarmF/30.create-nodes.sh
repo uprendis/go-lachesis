@@ -27,18 +27,18 @@ do
     --publish published=${PORT},target=${PORT},mode=ingress,protocol=udp \
     --publish published=${RPCP},target=${RPCP},mode=ingress \
     --publish published=${WSP},target=${WSP},mode=ingress \
-    --mount type=bind,source=/var/network,destination=/var/network \
+    --mount type=bind,source=/var/benchopera,destination=/var/benchopera \
     --replicas 1 \
     --with-registry-auth \
     --detach=false \
     --constraint node.hostname==$HOST \
-   ${REGISTRY_HOST}/network:${TAG} --nousb \
+   ${REGISTRY_HOST}/benchopera:${TAG} --nousb \
     --verbosity=3 \
     --fakenet=$ACC/$N \
     --rpc --rpcaddr="0.0.0.0" --rpcport=${RPCP} --rpccorsdomain="*" --rpcapi="eth,debug,admin,web3,personal,net,txpool,ftm,sfc" \
     --ws --wsaddr="0.0.0.0" --wsport=${WSP} --wsorigins="*" --wsapi="eth,debug,admin,web3,personal,net,txpool,ftm,sfc" \
     --port=${PORT} --nat="extip:${SWARM_HOST}" \
-    --datadir=/var/network \
+    --datadir=/var/benchopera \
     ${bootnode}
 
     if [ -z "$bootnode" ]
