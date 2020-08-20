@@ -59,19 +59,14 @@ func (s *Service) GetConsensusCallbacks() lachesis.ConsensusCallbacks {
 						// seal epoch
 						bs.EpochBlocks = 0
 						es := s.store.GetEpochState()
-						oldEpoch := es.Epoch
 						newEpoch := es.Epoch + 1
 						es.Epoch = newEpoch
 
 						// notify event checkers about new validation data
 						s.heavyCheckReader.PubKeys.Store(NewEpochPubKeys(newEpoch, s.config.Net.Genesis.Validators))
-
-						// sealings/prunings
-						s.packsOnNewEpoch(oldEpoch, newEpoch)
-						s.store.resetEpochStore(newEpoch)
 						s.store.SetEpochState(es)
 
-						// notify about new epoch after event connection
+						// notify about new epoch
 						s.emitter.OnNewEpoch(es.Validators, newEpoch)
 						s.feed.newEpoch.Send(newEpoch)
 
@@ -115,19 +110,25 @@ func (s *Service) processEvent(e *inter.Event) error {
 		return err
 	}
 
-	// set validator's last event. we don't care about forks, because this index is used only for emitter
-	s.store.SetLastEvent(e.Creator(), e.ID())
-
-	// track events with no descendants, i.e. heads
-	for _, parent := range e.Parents() {
-		s.store.DelHead(parent)
-	}
-	s.store.AddHead(e.ID())
-
 	s.packsOnNewEvent(e, e.Epoch())
 	s.emitter.OnNewEvent(e)
 
 	newEpoch := s.store.GetEpoch()
+
+	if newEpoch == oldEpoch {
+		// set validator's last event. we don't care about forks, because this index is used only for emitter
+		s.store.SetLastEvent(e.Creator(), e.ID())
+
+		// track events with no descendants, i.e. heads
+		for _, parent := range e.Parents() {
+			s.store.DelHead(parent)
+		}
+		s.store.AddHead(e.ID())
+	} else {
+		// epoch is sealed, prune epoch data
+		s.packsOnNewEpoch(oldEpoch, newEpoch)
+		s.store.resetEpochStore(newEpoch)
+	}
 
 	immediately := newEpoch != oldEpoch
 

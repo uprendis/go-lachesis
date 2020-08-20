@@ -23,8 +23,9 @@ type (
 	}
 )
 
-func newEpochStore(db kvdb.Store) *epochStore {
+func newEpochStore(db kvdb.DropableStore) *epochStore {
 	es := &epochStore{}
+	es.db = db
 	table.MigrateTables(&es.table, db)
 
 	err := errors.New("database closed")
@@ -45,19 +46,22 @@ func (s *Store) getEpochStore() *epochStore {
 	return es.(*epochStore)
 }
 
-// resetEpochStore is safe for concurrent use.
 func (s *Store) resetEpochStore(newEpoch idx.Epoch) {
 	oldEs := s.epochStore.Load()
 	// create new DB
 	s._loadEpochStore(newEpoch)
 	// drop previous DB
-	// there may be race condition with threads which hold this DB, so wrap with skiperrors
+	// there may be race condition with threads which hold this DB, so wrap tables with skiperrors
 	if oldEs != nil {
+		err := oldEs.(*epochStore).db.Close()
+		if err != nil {
+			s.Log.Error("Failed to close epoch DB", "err", err)
+			return
+		}
 		oldEs.(*epochStore).db.Drop()
 	}
 }
 
-// loadEpochStore is safe for concurrent use.
 func (s *Store) loadEpochStore(epoch idx.Epoch) {
 	if s.epochStore.Load() != nil {
 		return
@@ -65,7 +69,6 @@ func (s *Store) loadEpochStore(epoch idx.Epoch) {
 	s._loadEpochStore(epoch)
 }
 
-// _loadEpochStore is safe for concurrent use.
 func (s *Store) _loadEpochStore(epoch idx.Epoch) {
 	// create new DB
 	db := s.dbs.GetDb(fmt.Sprintf("gossip-%d", epoch))
