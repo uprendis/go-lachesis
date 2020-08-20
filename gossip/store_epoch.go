@@ -6,7 +6,7 @@ package gossip
 
 import (
 	"errors"
-	"github.com/Fantom-foundation/lachesis-base/hash"
+	"fmt"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
 	"github.com/Fantom-foundation/lachesis-base/kvdb"
 	"github.com/Fantom-foundation/lachesis-base/kvdb/skiperrors"
@@ -15,66 +15,59 @@ import (
 
 type (
 	epochStore struct {
-		Tips    kvdb.Store `table:"t"`
-		Heads   kvdb.Store `table:"H"`
+		db    kvdb.DropableStore
+		table struct {
+			Tips  kvdb.Store `table:"t"`
+			Heads kvdb.Store `table:"H"`
+		}
 	}
 )
 
 func newEpochStore(db kvdb.Store) *epochStore {
 	es := &epochStore{}
-	table.MigrateTables(es, db)
+	table.MigrateTables(&es.table, db)
 
 	err := errors.New("database closed")
 
-	es.Tips = skiperrors.Wrap(es.Tips, err)
-	es.Heads = skiperrors.Wrap(es.Heads, err)
+	// wrap with skiperrors to skip errors on reading from a dropped DB
+	es.table.Tips = skiperrors.Wrap(es.table.Tips, err)
+	es.table.Heads = skiperrors.Wrap(es.table.Heads, err)
 
 	return es
 }
 
-// getEpochStore is not safe for concurrent use.
-func (s *Store) getEpochStore(epoch idx.Epoch) *epochStore {
-	tables := s.EpochDbs.Get(uint64(epoch))
-	if tables == nil {
+// getEpochStore safe for concurrent use.
+func (s *Store) getEpochStore() *epochStore {
+	es := s.epochStore.Load()
+	if es == nil {
 		return nil
 	}
-
-	return tables.(*epochStore)
+	return es.(*epochStore)
 }
 
-// delEpochStore is not safe for concurrent use.
-func (s *Store) delEpochStore(epoch idx.Epoch) {
-	s.EpochDbs.Del(uint64(epoch))
+// resetEpochStore is safe for concurrent use.
+func (s *Store) resetEpochStore(newEpoch idx.Epoch) {
+	oldEs := s.epochStore.Load()
+	// create new DB
+	s._loadEpochStore(newEpoch)
+	// drop previous DB
+	// there may be race condition with threads which hold this DB, so wrap with skiperrors
+	if oldEs != nil {
+		oldEs.(*epochStore).db.Drop()
+	}
 }
 
-// SetLastEvent stores last unconfirmed event from a validator (off-chain)
-func (s *Store) SetLastEvent(epoch idx.Epoch, from idx.ValidatorID, id hash.Event) {
-	es := s.getEpochStore(epoch)
-	if es == nil {
+// loadEpochStore is safe for concurrent use.
+func (s *Store) loadEpochStore(epoch idx.Epoch) {
+	if s.epochStore.Load() != nil {
 		return
 	}
-
-	key := from.Bytes()
-	if err := es.Tips.Put(key, id.Bytes()); err != nil {
-		s.Log.Crit("Failed to put key-value", "err", err)
-	}
+	s._loadEpochStore(epoch)
 }
 
-// GetLastEvent returns stored last unconfirmed event from a validator (off-chain)
-func (s *Store) GetLastEvent(from idx.ValidatorID) *hash.Event {
-	es := s.getEpochStore(s.GetEpoch())
-	if es == nil {
-		return nil
-	}
-
-	key := from.Bytes()
-	idBytes, err := es.Tips.Get(key)
-	if err != nil {
-		s.Log.Crit("Failed to get key-value", "err", err)
-	}
-	if idBytes == nil {
-		return nil
-	}
-	id := hash.BytesToEvent(idBytes)
-	return &id
+// _loadEpochStore is safe for concurrent use.
+func (s *Store) _loadEpochStore(epoch idx.Epoch) {
+	// create new DB
+	db := s.dbs.GetDb(fmt.Sprintf("gossip-%d", epoch))
+	s.epochStore.Store(newEpochStore(db))
 }

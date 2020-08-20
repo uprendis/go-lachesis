@@ -2,7 +2,6 @@ package gossip
 
 import (
 	"bytes"
-	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/hashicorp/golang-lru"
 
-	"github.com/Fantom-foundation/go-lachesis/gossip/temporary"
 	"github.com/Fantom-foundation/go-lachesis/logger"
 )
 
@@ -26,7 +24,7 @@ type Store struct {
 
 	async *asyncStore
 
-	mainDb kvdb.Store
+	mainDB kvdb.Store
 	table  struct {
 		Version kvdb.Store `table:"_"`
 
@@ -38,16 +36,14 @@ type Store struct {
 		PackInfos  kvdb.Store `table:"p"`
 		Packs      kvdb.Store `table:"P"`
 		PacksNum   kvdb.Store `table:"n"`
-
-		TmpDbs kvdb.Store `table:"T"`
 	}
 
-	EpochDbs *temporary.Dbs
+	epochStore atomic.Value
 
 	cache struct {
-		Events     *lru.Cache `cache:"-"` // store by pointer
-		Blocks     *lru.Cache `cache:"-"` // store by pointer
-		PackInfos  *lru.Cache `cache:"-"` // store by value
+		Events     *lru.Cache   `cache:"-"` // store by pointer
+		Blocks     *lru.Cache   `cache:"-"` // store by pointer
+		PackInfos  *lru.Cache   `cache:"-"` // store by value
 		BlockState atomic.Value // store by pointer
 		EpochState atomic.Value // store by pointer
 	}
@@ -70,32 +66,15 @@ func NewStore(dbs *flushable.SyncedPool, cfg StoreConfig) *Store {
 		dbs:      dbs,
 		cfg:      cfg,
 		async:    newAsyncStore(dbs),
-		mainDb:   dbs.GetDb("gossip"),
+		mainDB:   dbs.GetDb("gossip"),
 		Instance: logger.MakeInstance(),
 	}
 
-	table.MigrateTables(&s.table, s.mainDb)
-
-	s.EpochDbs = s.newTmpDbs("epoch", func(ver uint64) (
-		db kvdb.DropableStore,
-		tables interface{},
-	) {
-		db = s.dbs.GetDb(fmt.Sprintf("gossip-%d", ver))
-		tables = newEpochStore(db)
-		return
-	})
+	table.MigrateTables(&s.table, s.mainDB)
 
 	s.initCache()
 
 	return s
-}
-
-func (s *Store) newTmpDbs(name string, maker temporary.DbMaker) *temporary.Dbs {
-	t := table.New(s.table.TmpDbs, []byte(name))
-	dbs := temporary.NewDbs(t, maker)
-	dbs.SetName(name)
-
-	return dbs
 }
 
 func (s *Store) initCache() {
@@ -113,7 +92,7 @@ func (s *Store) Close() {
 	table.MigrateTables(&s.table, nil)
 	table.MigrateCaches(&s.cache, setnil)
 
-	s.mainDb.Close()
+	s.mainDB.Close()
 	s.async.Close()
 }
 

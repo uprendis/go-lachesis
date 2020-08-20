@@ -68,8 +68,7 @@ func (s *Service) GetConsensusCallbacks() lachesis.ConsensusCallbacks {
 
 						// sealings/prunings
 						s.packsOnNewEpoch(oldEpoch, newEpoch)
-						s.store.delEpochStore(oldEpoch)
-						s.store.getEpochStore(newEpoch)
+						s.store.resetEpochStore(newEpoch)
 						s.store.SetEpochState(es)
 
 						// notify about new epoch after event connection
@@ -117,13 +116,13 @@ func (s *Service) processEvent(e *inter.Event) error {
 	}
 
 	// set validator's last event. we don't care about forks, because this index is used only for emitter
-	s.store.SetLastEvent(e.Epoch(), e.Creator(), e.ID())
+	s.store.SetLastEvent(e.Creator(), e.ID())
 
 	// track events with no descendants, i.e. heads
 	for _, parent := range e.Parents() {
-		s.store.DelHead(e.Epoch(), parent)
+		s.store.DelHead(parent)
 	}
-	s.store.AddHead(e.Epoch(), e.ID())
+	s.store.AddHead(e.ID())
 
 	s.packsOnNewEvent(e, e.Epoch())
 	s.emitter.OnNewEvent(e)
