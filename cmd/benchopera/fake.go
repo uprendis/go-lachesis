@@ -12,6 +12,14 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/benchopera/genesis"
 )
 
+var BytesPerSecondFlag = cli.StringFlag{
+	Name: "bps",
+}
+
+var PayloadFlag = cli.StringFlag{
+	Name: "payload",
+}
+
 // FakeNetFlag enables special testnet, where validators are automatically created
 var FakeNetFlag = cli.StringFlag{
 	Name:  "fakenet",

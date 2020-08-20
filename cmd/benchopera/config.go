@@ -125,6 +125,12 @@ func gossipConfigWithFlags(ctx *cli.Context, src gossip.Config) gossip.Config {
 	utils.CheckExclusive(ctx, FakeNetFlag, utils.DeveloperFlag, utils.TestnetFlag)
 	utils.CheckExclusive(ctx, FakeNetFlag, utils.DeveloperFlag, utils.ExternalSignerFlag) // Can't use both ephemeral unlocked and external signer
 
+	if ctx.GlobalIsSet(PayloadFlag.Name) {
+		cfg.Emitter.PayloadSize = ctx.GlobalUint64(PayloadFlag.Name)
+	}
+	if ctx.GlobalIsSet(BytesPerSecondFlag.Name) {
+		cfg.Emitter.BytesPerSec = ctx.GlobalUint64(BytesPerSecondFlag.Name)
+	}
 	if ctx.GlobalIsSet(utils.NetworkIdFlag.Name) {
 		cfg.Net.NetworkID = ctx.GlobalUint64(utils.NetworkIdFlag.Name)
 	}
