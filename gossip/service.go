@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Fantom-foundation/go-lachesis/benchopera/genesis"
 	"github.com/Fantom-foundation/go-lachesis/gossip/emitter"
+	"github.com/Fantom-foundation/go-lachesis/utils/throughput"
 	"github.com/Fantom-foundation/lachesis-base/eventcheck/epochcheck"
 	"github.com/Fantom-foundation/lachesis-base/inter/dag"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
@@ -86,6 +87,7 @@ type Service struct {
 	emitter          *emitter.Emitter
 	heavyCheckReader HeavyCheckReader
 	checkers         *eventcheck.Checkers
+	meter            *throughput.Meter
 
 	feed ServiceFeed
 
@@ -113,6 +115,7 @@ func NewService(ctx *node.ServiceContext, config *Config, store *Store, engine l
 
 		engine:   engine,
 		engineMu: new(sync.RWMutex),
+		meter:    throughput.New(),
 
 		Instance: logger.MakeInstance(),
 	}

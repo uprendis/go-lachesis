@@ -3,6 +3,7 @@ package emitter
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/Fantom-foundation/go-lachesis/utils/throughput"
 	"github.com/Fantom-foundation/lachesis-base/emitter/ancestor"
 	"github.com/Fantom-foundation/lachesis-base/emitter/doublesign"
 	"github.com/Fantom-foundation/lachesis-base/hash"
@@ -50,6 +51,8 @@ type Emitter struct {
 
 	intervals EmitIntervals
 
+	meter *throughput.Meter
+
 	done chan struct{}
 	wg   sync.WaitGroup
 
@@ -79,6 +82,7 @@ func New(
 		world:     world,
 		intervals: config.EmitIntervals,
 		Periodic:  logger.Periodic{Instance: loggerInstance},
+		meter:     throughput.New(),
 	}
 }
 
@@ -376,7 +380,11 @@ func (em *Emitter) EmitEvent() *inter.Event {
 	}
 	em.prevEmittedTime = time.Now() // record time after connecting, to add the event processing time"
 
-	em.Log.Info("New event emitted", "id", e.ID(), "parents", len(e.Parents()), "by", e.Creator(), "frame", inter.FmtFrame(e.Frame(), e.IsRoot()), "payload", len(e.Payload()), "t", time.Since(start))
+	em.meter.Mark(uint64(len(e.Payload())))
+
+	em.Log.Info("New event emitted", "id", e.ID(), "parents", len(e.Parents()), "by", e.Creator(),
+		"frame", inter.FmtFrame(e.Frame(), e.IsRoot()), "payload", len(e.Payload()),
+		"emitting_MB/s", em.meter.Per(time.Second)/1e6, "t", time.Since(start))
 
 	return e
 }

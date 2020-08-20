@@ -62,9 +62,6 @@ func (s *Service) GetConsensusCallbacks() lachesis.ConsensusCallbacks {
 						oldEpoch := es.Epoch
 						newEpoch := es.Epoch + 1
 						es.Epoch = newEpoch
-						// in benchopera, validators group doesn't change, so just use genesis validators (even if they became cheaters)
-						es.Validators = es.Validators
-						s.store.SetEpochState(es)
 
 						// notify event checkers about new validation data
 						s.heavyCheckReader.PubKeys.Store(NewEpochPubKeys(newEpoch, s.config.Net.Genesis.Validators))
@@ -73,6 +70,7 @@ func (s *Service) GetConsensusCallbacks() lachesis.ConsensusCallbacks {
 						s.packsOnNewEpoch(oldEpoch, newEpoch)
 						s.store.delEpochStore(oldEpoch)
 						s.store.getEpochStore(newEpoch)
+						s.store.SetEpochState(es)
 
 						// notify about new epoch after event connection
 						s.emitter.OnNewEpoch(es.Validators, newEpoch)
@@ -82,7 +80,11 @@ func (s *Service) GetConsensusCallbacks() lachesis.ConsensusCallbacks {
 						sealEpoch = es.Validators
 					}
 					s.store.SetBlockState(bs)
-					log.Info("New block", "index", bs.Block, "atropos", block.Atropos, "payload", payloadSize, "t", time.Since(start))
+
+					// meter
+					s.meter.Mark(uint64(payloadSize))
+					log.Info("New block", "index", bs.Block, "atropos", block.Atropos, "payload", payloadSize,
+						"payload_MB/s", s.meter.Per(time.Second)/1e6, "t", time.Since(start))
 					return sealEpoch
 				},
 			}
@@ -97,8 +99,12 @@ func (s *Service) processEvent(e *inter.Event) error {
 		return errStopped
 	}
 
-	if s.store.HasEvent(e.ID()) { // sanity check
+	// repeat the checks under the mutex which may depend on volatile data
+	if s.store.HasEvent(e.ID()) {
 		return eventcheck.ErrAlreadyConnectedEvent
+	}
+	if err := s.checkers.Epochcheck.Validate(e); err != nil {
+		return err
 	}
 
 	oldEpoch := s.store.GetEpoch()
