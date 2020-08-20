@@ -416,5 +416,5 @@ func (em *Emitter) nameEventForDebug(e *inter.Event) {
 	name = name[len(name)-1:]
 	hash.SetEventName(e.ID(), fmt.Sprintf("%s%03d",
 		strings.ToLower(string(name)),
-		e.Seq))
+		e.Seq()))
 }
