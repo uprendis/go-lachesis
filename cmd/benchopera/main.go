@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/Fantom-foundation/go-lachesis/debug"
 	"os"
 	"sort"
 	"time"
@@ -129,9 +130,15 @@ func init() {
 	app.Flags = append(app.Flags, nodeFlags...)
 	app.Flags = append(app.Flags, rpcFlags...)
 	app.Flags = append(app.Flags, consoleFlags...)
+	app.Flags = append(app.Flags, debug.Flags...)
 	app.Flags = append(app.Flags, metricsFlags...)
 
 	app.Before = func(ctx *cli.Context) error {
+		logdir := ""
+		if err := debug.Setup(ctx, logdir); err != nil {
+			return err
+		}
+
 		// Start metrics export if enabled
 		utils.SetupMetrics(ctx)
 		metrics.SetupPrometheus(ctx)
@@ -140,6 +147,7 @@ func init() {
 	}
 
 	app.After = func(ctx *cli.Context) error {
+		debug.Exit()
 		console.Stdin.Close() // Resets terminal mode.
 
 		return nil
@@ -186,7 +194,15 @@ func makeNode(ctx *cli.Context, cfg *config) *node.Node {
 	// the factory method approach is to support service restarts without relying on the
 	// individual implementations' support for such operations.
 	gossipService := func(ctx *node.ServiceContext) (node.Service, error) {
-		return gossip.NewService(ctx, &cfg.Lachesis, gdb, engine)
+		svc, err := gossip.NewService(ctx, &cfg.Lachesis, gdb, engine)
+		if err != nil {
+			return nil, err
+		}
+		err = engine.Bootstrap(svc.GetConsensusCallbacks())
+		if err != nil {
+			return nil, err
+		}
+		return svc, nil
 	}
 
 	if err := stack.Register(gossipService); err != nil {
@@ -208,6 +224,7 @@ func makeConfigNode(ctx *cli.Context, cfg *node.Config) *node.Node {
 // startNode boots up the system node and all registered protocols, after which
 // it unlocks any requested accounts, and starts the RPC/IPC interfaces.
 func startNode(ctx *cli.Context, stack *node.Node) {
+	debug.Memsize.Add("node", stack)
 	// Start up the node itself
 	utils.StartNode(stack)
 

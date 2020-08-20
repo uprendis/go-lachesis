@@ -87,6 +87,7 @@ func (em *Emitter) init() {
 	em.syncStatus.lastConnected = time.Now()
 	em.syncStatus.startup = time.Now()
 	validators, epoch := em.world.Store.GetEpochValidators()
+	em.prevEmittedTime = em.loadPrevEmitTime()
 	em.OnNewEpoch(validators, epoch)
 }
 
@@ -375,7 +376,7 @@ func (em *Emitter) EmitEvent() *inter.Event {
 	}
 	em.prevEmittedTime = time.Now() // record time after connecting, to add the event processing time"
 
-	em.Log.Info("New event emitted", "id", e.ID(), "parents", len(e.Parents()), "by", e.Creator, "frame", inter.FmtFrame(e.Frame(), e.IsRoot()), "payload", len(e.Payload()), "t", time.Since(start))
+	em.Log.Info("New event emitted", "id", e.ID(), "parents", len(e.Parents()), "by", e.Creator(), "frame", inter.FmtFrame(e.Frame(), e.IsRoot()), "payload", len(e.Payload()), "t", time.Since(start))
 
 	return e
 }

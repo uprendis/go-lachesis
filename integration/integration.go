@@ -24,6 +24,10 @@ func NewIntegration(ctx *adapters.ServiceContext, network benchopera.Config, val
 	if err != nil {
 		panic(err)
 	}
+	err = engine.Bootstrap(svc.GetConsensusCallbacks())
+	if err != nil {
+		panic(err)
+	}
 
 	return svc
 }

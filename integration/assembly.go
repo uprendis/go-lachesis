@@ -28,7 +28,11 @@ type GossipStoreAdapter struct {
 }
 
 func (g *GossipStoreAdapter) GetEvent(id hash.Event) dag.Event {
-	return g.Store.GetEvent(id)
+	e := g.Store.GetEvent(id)
+	if e == nil {
+		return nil
+	}
+	return e
 }
 
 // MakeEngine makes consensus engine from config.
@@ -37,9 +41,9 @@ func MakeEngine(dataDir string, gossipCfg *gossip.Config) (*abft.Lachesis, *flus
 
 	gdb := gossip.NewStore(dbs, gossipCfg.StoreConfig)
 
-	cMainDb := dbs.GetDb("benchopera")
+	cMainDb := dbs.GetDb("lachesis")
 	cGetEpochDB := func(epoch idx.Epoch) kvdb.DropableStore {
-		return dbs.GetDb(fmt.Sprintf("benchopera-%d", epoch))
+		return dbs.GetDb(fmt.Sprintf("lachesis-%d", epoch))
 	}
 	cdb := abft.NewStore(cMainDb, cGetEpochDB, panics("Lachesis store"), abft.DefaultStoreConfig())
 
@@ -56,7 +60,7 @@ func MakeEngine(dataDir string, gossipCfg *gossip.Config) (*abft.Lachesis, *flus
 
 	if isNew {
 		err = cdb.ApplyGenesis(&abft.Genesis{
-			Epoch:      abft.FirstEpoch,
+			Epoch:      gdb.GetEpoch(),
 			Validators: gossipCfg.Net.Genesis.Validators.Build(),
 			Atropos:    genesisAtropos,
 		})

@@ -41,7 +41,7 @@ func DefaultDagConfig() DagConfig {
 	return DagConfig{
 		MaxParents:     10,
 		MaxFreeParents: 3,
-		MaxEpochBlocks: 1000,
+		MaxEpochBlocks: 10,
 	}
 }
 

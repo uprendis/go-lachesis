@@ -3,6 +3,7 @@ package gossip
 import (
 	"fmt"
 	"github.com/Fantom-foundation/go-lachesis/inter"
+	"github.com/Fantom-foundation/lachesis-base/abft"
 	"github.com/Fantom-foundation/lachesis-base/hash"
 	"github.com/Fantom-foundation/lachesis-base/inter/dag"
 	"github.com/Fantom-foundation/lachesis-base/inter/idx"
@@ -76,6 +77,15 @@ func (s *Store) applyGenesis(net *benchopera.Config) (genesisAtropos hash.Event,
 		Events:  hash.Events{genesisAtropos},
 	}
 	s.SetBlock(0, block)
+
+	s.SetEpochState(EpochState{
+		Epoch:      abft.FirstEpoch,
+		Validators: net.Genesis.Validators.Build(),
+	})
+	s.SetBlockState(BlockState{
+		Block:       0,
+		EpochBlocks: 0,
+	})
 
 	return genesisAtropos, genesisState, nil
 }

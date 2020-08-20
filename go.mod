@@ -8,10 +8,9 @@ require (
 	github.com/aristanetworks/goarista v0.0.0-20191023202215-f096da5361bb // indirect
 	github.com/btcsuite/btcd v0.20.1-beta // indirect
 	github.com/certifi/gocertifi v0.0.0-20191021191039-0944d244cd40 // indirect
-	github.com/cespare/cp v1.1.1
-	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
+	github.com/cespare/cp v1.1.1 // indirect
 	github.com/deckarep/golang-set v1.7.1
-	github.com/docker/docker v1.13.1
+	github.com/docker/docker v1.13.1 // indirect
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/ethereum/go-ethereum v1.9.8
@@ -35,9 +34,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.6 // indirect
 	github.com/naoina/toml v0.1.2-0.20170918210437-9fafd6967416
 	github.com/olekukonko/tablewriter v0.0.2 // indirect
-	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pborman/uuid v1.2.0 // indirect
-	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.2.1
 	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
 	github.com/prometheus/tsdb v0.10.0 // indirect
@@ -47,12 +44,8 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect
-	github.com/uber/jaeger-client-go v2.20.1+incompatible
-	github.com/uber/jaeger-lib v2.2.0+incompatible
-	go.uber.org/atomic v1.5.1 // indirect
 	golang.org/x/crypto v0.0.0-20191108234033-bd318be0434a
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
-	golang.org/x/tools v0.0.0-20191109212701-97ad0ed33101 // indirect
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20200619000410-60c24ae608a6 // indirect
 	gopkg.in/urfave/cli.v1 v1.22.1
 )
@@ -61,4 +54,4 @@ replace gopkg.in/urfave/cli.v1 => github.com/urfave/cli v1.20.0
 
 replace github.com/ethereum/go-ethereum => github.com/Fantom-foundation/go-ethereum v1.9.8-ftm-0.10
 
-replace github.com/Fantom-foundation/lachesis-base => github.com/uprendis/lachesis-base v0.0.0-20200819100452-aeed0ea1c18d
+replace github.com/Fantom-foundation/lachesis-base => github.com/uprendis/lachesis-base v0.0.0-20200819152036-1aaafe7e58d1

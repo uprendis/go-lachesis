@@ -52,17 +52,15 @@ func (s *Service) GetConsensusCallbacks() lachesis.ConsensusCallbacks {
 					}
 					bs.Block++
 					bs.EpochBlocks++
-					s.store.SetBlockState(bs)
 					s.store.SetBlock(bs.Block, block)
-
-					log.Info("New block", "index", bs.Block, "atropos", block.Atropos, "payload", payloadSize, "t", time.Since(start))
 
 					// in benchopera, sealing condition is straightforward, based only on blocks count or cheaters present
 					if bs.EpochBlocks >= s.config.Net.Dag.MaxEpochBlocks || cBlock.Cheaters.Len() != 0 {
 						// seal epoch
+						bs.EpochBlocks = 0
 						es := s.store.GetEpochState()
 						oldEpoch := es.Epoch
-						newEpoch := es.Epoch
+						newEpoch := es.Epoch + 1
 						es.Epoch = newEpoch
 						// in benchopera, validators group doesn't change, so just use genesis validators (even if they became cheaters)
 						es.Validators = es.Validators
@@ -81,9 +79,11 @@ func (s *Service) GetConsensusCallbacks() lachesis.ConsensusCallbacks {
 						s.feed.newEpoch.Send(newEpoch)
 
 						// in benchopera, validators group doesn't change, so just use genesis validators (even if they became cheaters)
-						return es.Validators
+						sealEpoch = es.Validators
 					}
-					return nil
+					s.store.SetBlockState(bs)
+					log.Info("New block", "index", bs.Block, "atropos", block.Atropos, "payload", payloadSize, "t", time.Since(start))
+					return sealEpoch
 				},
 			}
 		},

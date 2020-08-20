@@ -72,6 +72,7 @@ type ProtocolManager struct {
 	store        *Store
 	processEvent func(*inter.Event) error
 	engineMu     *sync.RWMutex
+	checkers     *eventcheck.Checkers
 
 	notifier         dagNotifier
 	emittedEventsCh  chan *inter.Event
@@ -120,6 +121,7 @@ func NewProtocolManager(
 		newPeerCh:    make(chan *peer),
 		noMorePeers:  make(chan struct{}),
 		quitSync:     make(chan struct{}),
+		checkers:     checkers,
 
 		Instance: logger.MakeInstance(),
 	}
@@ -173,7 +175,7 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 			if err != nil {
 				return err
 			}
-			log.Info("New event", "id", e.ID(), "parents", len(e.Parents()), "by", e.Creator, "frame", inter.FmtFrame(e.Frame(), e.IsRoot()), "payload", len(e.Payload()), "t", time.Since(start))
+			log.Info("New event", "id", e.ID(), "parents", len(e.Parents()), "by", e.Creator(), "frame", inter.FmtFrame(e.Frame(), e.IsRoot()), "payload", len(e.Payload()), "t", time.Since(start))
 
 			// If the event is indeed in our own graph, announce it
 			if atomic.LoadUint32(&pm.synced) != 0 { // announce only if synced up
@@ -196,7 +198,11 @@ func (pm *ProtocolManager) makeFetcher(checkers *eventcheck.Checkers) (*fetcher.
 		},
 
 		Get: func(id hash.Event) dag.Event {
-			return pm.store.GetEvent(id)
+			e := pm.store.GetEvent(id)
+			if e == nil {
+				return nil
+			}
+			return e
 		},
 
 		Check: bufferedCheck,
@@ -333,11 +339,13 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	// start sync handlers
 	go pm.syncer()
 	pm.fetcher.Start()
+	pm.checkers.Heavycheck.Start()
 }
 
 func (pm *ProtocolManager) Stop() {
 	log.Info("Stopping Fantom protocol")
 
+	pm.checkers.Heavycheck.Stop()
 	pm.downloader.Terminate()
 	pm.fetcher.Stop()
 
