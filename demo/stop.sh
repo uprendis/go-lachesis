@@ -3,7 +3,8 @@
 PROG=benchopera
 
 # kill all benchopera processes
-pkill "${PROG}"
+killall "${PROG}"
+sleep 3
 
 # remove demo data
 rm -rf /tmp/benchopera-demo/datadir/

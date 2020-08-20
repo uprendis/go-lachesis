@@ -358,8 +358,6 @@ func (em *Emitter) EmitEvent() *inter.Event {
 		return nil // short circuit if not validator
 	}
 
-	start := time.Now()
-
 	em.world.EngineMu.Lock()
 	defer em.world.EngineMu.Unlock()
 
@@ -368,6 +366,8 @@ func (em *Emitter) EmitEvent() *inter.Event {
 		return nil
 	}
 	em.syncStatus.prevLocalEmittedID = e.ID()
+
+	start := time.Now()
 
 	err := em.world.ProcessEvent(e)
 	if err != nil {

@@ -60,6 +60,7 @@ func init() {
 		utils.BootnodesV5Flag,
 		DataDirFlag,
 		utils.NoUSBFlag,
+		utils.ListenPortFlag,
 		utils.MaxPeersFlag,
 		utils.MaxPendingPeersFlag,
 		utils.NATFlag,
