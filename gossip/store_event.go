@@ -1,9 +1,5 @@
 package gossip
 
-/*
-	In LRU cache data stored like pointer
-*/
-
 import (
 	"bytes"
 	"github.com/Fantom-foundation/go-lachesis/inter"

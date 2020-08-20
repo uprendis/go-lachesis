@@ -52,10 +52,10 @@ type peer struct {
 
 	version int // Protocol version negotiated
 
-	knownEvents mapset.Set                // Set of event hashes known to be known by this peer
-	queuedProps chan inter.Events         // Queue of events to broadcast to the peer
-	queuedAnns  chan hash.Events          // Queue of events to announce to the peer
-	term        chan struct{}             // Termination channel to stop the broadcaster
+	knownEvents mapset.Set        // Set of event hashes known to be known by this peer
+	queuedProps chan inter.Events // Queue of events to broadcast to the peer
+	queuedAnns  chan hash.Events  // Queue of events to announce to the peer
+	term        chan struct{}     // Termination channel to stop the broadcaster
 
 	progress PeerProgress
 

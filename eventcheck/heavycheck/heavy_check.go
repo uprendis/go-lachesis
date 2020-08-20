@@ -35,8 +35,8 @@ type Reader interface {
 
 // Check which require only parents list + current epoch info
 type Checker struct {
-	config   *benchopera.DagConfig
-	reader   Reader
+	config *benchopera.DagConfig
+	reader Reader
 
 	numOfThreads int
 

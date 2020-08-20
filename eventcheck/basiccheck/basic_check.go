@@ -5,8 +5,8 @@ import (
 	base "github.com/Fantom-foundation/lachesis-base/eventcheck/basiccheck"
 	"github.com/Fantom-foundation/lachesis-base/inter/dag"
 
-	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/benchopera"
+	"github.com/Fantom-foundation/go-lachesis/inter"
 )
 
 var (
@@ -40,7 +40,7 @@ func (v *Checker) Validate(de dag.Event) error {
 	if e.CreationTime() <= 0 {
 		return ErrZeroTime
 	}
-	if len(e.Payload()) > v.config.MaxParents {
+	if len(e.Parents()) > v.config.MaxParents {
 		return ErrTooManyParents
 	}
 

@@ -32,6 +32,7 @@ do
 
     ${EXEC} \
 	--fakenet $i/$N \
+	--payload 100000 --bps 1000000 \
 	--nat extip:127.0.0.1 \
 	--port ${localport} --rpc --rpcapi "admin,net" --rpcport ${port} --nousb --verbosity 3 \
 	--datadir "${LACHESIS_BASE_DIR}/datadir/lach$i" &

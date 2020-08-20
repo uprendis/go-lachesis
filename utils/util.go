@@ -8,9 +8,6 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
-
-	
-
 )
 
 var startBase uint32 = 12000

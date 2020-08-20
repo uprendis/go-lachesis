@@ -11,9 +11,9 @@ import (
 type (
 	// Validator is a helper structure to define genesis validators
 	Validator struct {
-		ID      idx.ValidatorID
-		PubKey  []byte
-		Stake   *big.Int
+		ID     idx.ValidatorID
+		PubKey []byte
+		Stake  *big.Int
 	}
 
 	Validators []Validator

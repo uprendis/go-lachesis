@@ -61,17 +61,17 @@ func DefaultConfig(network benchopera.Config) Config {
 // DefaultStoreConfig for product.
 func DefaultStoreConfig() StoreConfig {
 	return StoreConfig{
-		EventsCacheSize:        500,
-		BlockCacheSize:         100,
-		PackInfosCacheSize:     100,
+		EventsCacheSize:    500,
+		BlockCacheSize:     100,
+		PackInfosCacheSize: 100,
 	}
 }
 
 // LiteStoreConfig is for tests or inmemory.
 func LiteStoreConfig() StoreConfig {
 	return StoreConfig{
-		EventsCacheSize:        100,
-		BlockCacheSize:         100,
-		PackInfosCacheSize:     100,
+		EventsCacheSize:    100,
+		BlockCacheSize:     100,
+		PackInfosCacheSize: 100,
 	}
 }

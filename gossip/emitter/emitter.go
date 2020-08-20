@@ -262,7 +262,7 @@ func (em *Emitter) createEvent(payload []byte) *inter.Event {
 		// sanity check
 		if em.world.Checkers != nil {
 			if err := em.world.Checkers.Validate(event, parentEvents); err != nil {
-				em.Periodic.Error(time.Second, "Signed event incorrectly", "err", err)
+				em.Periodic.Error(time.Second, "Event check failed during event emitting", "err", err)
 				return nil
 			}
 		}
@@ -357,6 +357,24 @@ func (em *Emitter) isAllowedToEmit(e *inter.MutableEvent) bool {
 	return true
 }
 
+func (em *Emitter) getTestPayload() []byte {
+	passedTime := float64(time.Now().Sub(em.syncStatus.startup)) / (float64(time.Second))
+	neededBytes := uint64(passedTime * float64(em.config.BytesPerSec))
+	payloadSize := uint64(0)
+	if em.meter.Total() < neededBytes {
+		payloadSize = em.config.PayloadSize
+	}
+	if payloadSize == 0 {
+		return []byte{}
+	}
+	payload := make([]byte, payloadSize)
+	seed := int(time.Now().UnixNano())
+	for i, _ := range payload {
+		payload[i] = byte(seed * i) // pseudo-random to avoid a simple compression of DB
+	}
+	return payload
+}
+
 func (em *Emitter) EmitEvent() *inter.Event {
 	if em.config.Validator == 0 {
 		return nil // short circuit if not validator
@@ -365,7 +383,7 @@ func (em *Emitter) EmitEvent() *inter.Event {
 	em.world.EngineMu.Lock()
 	defer em.world.EngineMu.Unlock()
 
-	e := em.createEvent([]byte{})
+	e := em.createEvent(em.getTestPayload())
 	if e == nil {
 		return nil
 	}
@@ -378,7 +396,7 @@ func (em *Emitter) EmitEvent() *inter.Event {
 		em.Log.Error("Emitted event connection error", "err", err)
 		return nil
 	}
-	em.prevEmittedTime = time.Now() // record time after connecting, to add the event processing time"
+	em.prevEmittedTime = e.CreationTime().Time()
 
 	em.meter.Mark(uint64(len(e.Payload())))
 

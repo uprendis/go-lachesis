@@ -90,9 +90,9 @@ var errorToString = map[int]string{
 
 // statusData is the benchopera packet for the status message. It's used for compatibility with some ETH wallets.
 type statusData struct {
-	ProtocolVersion   uint32
-	NetworkID         uint64
-	Genesis           common.Hash
+	ProtocolVersion uint32
+	NetworkID       uint64
+	Genesis         common.Hash
 }
 
 // PeerProgress is synchronization status of a peer

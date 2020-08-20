@@ -19,6 +19,10 @@ type EmitIntervals struct {
 type Config struct {
 	Validator idx.ValidatorID
 
+	// throughput experimental testing
+	BytesPerSec uint64
+	PayloadSize uint64
+
 	EpochTailLength idx.Frame
 	EmitIntervals   EmitIntervals // event emission intervals
 }
@@ -27,7 +31,7 @@ type Config struct {
 func DefaultEmitterConfig() Config {
 	return Config{
 		EmitIntervals: EmitIntervals{
-			Min:                  200 * time.Millisecond,
+			Min:                  50 * time.Millisecond,
 			Max:                  12 * time.Minute,
 			DoublesignProtection: 30 * time.Minute, // should be at least 2x of MaxEmitInterval
 		},

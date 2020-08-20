@@ -219,6 +219,7 @@ func (s *Service) APIs() []rpc.API {
 func (s *Service) Start(srv *p2p.Server) error {
 	// load epoch DB
 	s.store.loadEpochStore(s.store.GetEpoch())
+
 	// Start the RPC service
 	s.netRPCService = api.NewPublicNetAPI(srv, s.config.Net.NetworkID)
 

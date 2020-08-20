@@ -135,7 +135,7 @@ func NewProtocolManager(
 }
 
 func (pm *ProtocolManager) peerMisbehaviour(peer string, err error) bool {
-	if eventcheck.IsBan(err) {
+	if eventcheck.IsBan(err) && err != packsdownloader.ErrAllUnknownBeforeKnown {
 		log.Warn("Dropping peer due to a misbehaviour", "peer", peer, "err", err)
 		pm.removePeer(peer)
 		return true

@@ -1,9 +1,5 @@
 package gossip
 
-/*
-	In LRU cache data stored like pointer
-*/
-
 import (
 	"errors"
 	"fmt"
@@ -49,7 +45,7 @@ func (s *Store) getEpochStore() *epochStore {
 func (s *Store) resetEpochStore(newEpoch idx.Epoch) {
 	oldEs := s.epochStore.Load()
 	// create new DB
-	s._loadEpochStore(newEpoch)
+	s.createEpochStore(newEpoch)
 	// drop previous DB
 	// there may be race condition with threads which hold this DB, so wrap tables with skiperrors
 	if oldEs != nil {
@@ -66,10 +62,10 @@ func (s *Store) loadEpochStore(epoch idx.Epoch) {
 	if s.epochStore.Load() != nil {
 		return
 	}
-	s._loadEpochStore(epoch)
+	s.createEpochStore(epoch)
 }
 
-func (s *Store) _loadEpochStore(epoch idx.Epoch) {
+func (s *Store) createEpochStore(epoch idx.Epoch) {
 	// create new DB
 	db := s.dbs.GetDb(fmt.Sprintf("gossip-%d", epoch))
 	s.epochStore.Store(newEpochStore(db))
