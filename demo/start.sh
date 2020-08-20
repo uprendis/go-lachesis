@@ -7,8 +7,6 @@ set -e
 
 # number of nodes N
 N=5
-LIMIT_CPU=$(echo "scale=2; 1/$N" | bc)
-LIMIT_IO=$(echo "500/$N" | bc)
 
 #
 PROG=benchopera
@@ -33,7 +31,7 @@ do
     ${EXEC} \
 	--fakenet $i/$N \
 	--payload 100000 --bps 1000000 \
-	--nat extip:127.0.0.1 \
+	--nat extip:${IP} \
 	--port ${localport} --rpc --rpcapi "admin,net" --rpcport ${port} --nousb --verbosity 3 \
 	--datadir "${LACHESIS_BASE_DIR}/datadir/lach$i" &
     echo -e "Started lachesis client at ${IP}:${port}"
