@@ -7,14 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	notify "github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/Fantom-foundation/go-lachesis/eventcheck"
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
 	"github.com/Fantom-foundation/go-lachesis/gossip/fetcher"
@@ -24,6 +16,12 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/inter"
 	"github.com/Fantom-foundation/go-lachesis/inter/idx"
 	"github.com/Fantom-foundation/go-lachesis/logger"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	notify "github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 const (
@@ -449,251 +447,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 // peer. The remote connection is torn down upon returning any error.
 func (pm *ProtocolManager) handleMsg(p *peer) error {
 	// Read the next message from the remote peer, and ensure it's fully consumed
-	msg, err := p.rw.ReadMsg()
-	if err != nil {
-		return err
-	}
-	if msg.Size > protocolMaxMsgSize {
-		return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, protocolMaxMsgSize)
-	}
-	defer msg.Discard()
-
-	myEpoch := pm.engine.GetEpoch()
-	peerDwnlr := pm.downloader.Peer(p.id)
-
-	// Handle the message depending on its contents
-	switch {
-	case msg.Code == EthStatusMsg:
-		// Status messages should never arrive after the handshake
-		return errResp(ErrExtraStatusMsg, "uncontrolled status message")
-
-	case msg.Code == ProgressMsg:
-		var progress PeerProgress
-		if err := msg.Decode(&progress); err != nil {
-			return errResp(ErrDecode, "%v: %v", msg, err)
-		}
-		p.SetProgress(progress)
-		if progress.Epoch == myEpoch {
-			atomic.StoreUint32(&pm.synced, 1) // Mark initial sync done on any peer which has the same epoch
-		}
-
-		// notify downloader about new peer's epoch
-		_ = pm.downloader.RegisterPeer(packsdownloader.Peer{
-			ID:               p.id,
-			Epoch:            p.progress.Epoch,
-			RequestPack:      p.RequestPack,
-			RequestPackInfos: p.RequestPackInfos,
-		}, myEpoch)
-		peerDwnlr = pm.downloader.Peer(p.id)
-
-		if peerDwnlr != nil && progress.LastPackInfo.Index > 0 {
-			_ = peerDwnlr.NotifyPackInfo(p.progress.Epoch, progress.LastPackInfo.Index, progress.LastPackInfo.Heads, time.Now())
-		}
-
-	case msg.Code == NewEventHashesMsg:
-		if pm.fetcher.Overloaded() {
-			break
-		}
-		// Fresh events arrived, make sure we have a valid and fresh graph to handle them
-		if atomic.LoadUint32(&pm.synced) == 0 {
-			break
-		}
-		var announces hash.Events
-		if err := msg.Decode(&announces); err != nil {
-			return errResp(ErrDecode, "%v: %v", msg, err)
-		}
-		if err := checkLenLimits(len(announces), announces); err != nil {
-			return err
-		}
-		// Mark the hashes as present at the remote node
-		for _, id := range announces {
-			p.MarkEvent(id)
-		}
-		// Schedule all the unknown hashes for retrieval
-		_ = pm.fetcher.Notify(p.id, announces, time.Now(), p.RequestEvents)
-
-	case msg.Code == EventsMsg:
-		if pm.fetcher.Overloaded() {
-			break
-		}
-		var events []*inter.Event
-		if err := msg.Decode(&events); err != nil {
-			return errResp(ErrDecode, "%v: %v", msg, err)
-		}
-		if err := checkLenLimits(len(events), events); err != nil {
-			return err
-		}
-		// Mark the hashes as present at the remote node
-		for _, e := range events {
-			p.MarkEvent(e.Hash())
-		}
-		_ = pm.fetcher.Enqueue(p.id, events, time.Now(), p.RequestEvents)
-
-	case msg.Code == EvmTxMsg:
-		// Transactions arrived, make sure we have a valid and fresh graph to handle them
-		if atomic.LoadUint32(&pm.synced) == 0 {
-			break
-		}
-		// Transactions can be processed, parse all of them and deliver to the pool
-		var txs []*types.Transaction
-		if err := msg.Decode(&txs); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		for i, tx := range txs {
-			// Validate and mark the remote transaction
-			if tx == nil {
-				return errResp(ErrDecode, "transaction %d is nil", i)
-			}
-			p.MarkTransaction(tx.Hash())
-		}
-		pm.txpool.AddRemotes(txs)
-
-	case msg.Code == GetEventsMsg:
-		var requests hash.Events
-		if err := msg.Decode(&requests); err != nil {
-			return errResp(ErrDecode, "%v: %v", msg, err)
-		}
-		if err := checkLenLimits(len(requests), requests); err != nil {
-			return err
-		}
-
-		rawEvents := make([]rlp.RawValue, 0, len(requests))
-		ids := make(hash.Events, 0, len(requests))
-		size := 0
-		for _, id := range requests {
-			if raw := pm.store.GetEventRLP(id); raw != nil {
-				rawEvents = append(rawEvents, raw)
-				ids = append(ids, id)
-				size += len(raw)
-			} else {
-				pm.Log.Debug("requested event not found", "hash", id)
-			}
-			if size >= softResponseLimitSize {
-				break
-			}
-		}
-		if len(rawEvents) != 0 {
-			_ = p.SendEventsRLP(rawEvents, ids)
-		}
-
-	case msg.Code == GetPackInfosMsg:
-		var request getPackInfosData
-		if err := msg.Decode(&request); err != nil {
-			return errResp(ErrDecode, "%v: %v", msg, err)
-		}
-		if err := checkLenLimits(len(request.Indexes), request); err != nil {
-			return err
-		}
-
-		packsNum, ok := pm.store.GetPacksNum(request.Epoch)
-		if !ok {
-			// no packs in the requested epoch
-			break
-		}
-
-		rawPackInfos := make([]rlp.RawValue, 0, len(request.Indexes))
-		size := 0
-		for _, index := range request.Indexes {
-			if index >= packsNum {
-				// return only pinned and existing packs
-				continue
-			}
-
-			if raw := pm.store.GetPackInfoRLP(request.Epoch, index); raw != nil {
-				rawPackInfos = append(rawPackInfos, raw)
-				size += len(raw)
-			}
-			if size >= softResponseLimitSize {
-				break
-			}
-		}
-		if len(rawPackInfos) != 0 {
-			_ = p.SendPackInfosRLP(&packInfosDataRLP{
-				Epoch:           request.Epoch,
-				TotalNumOfPacks: packsNum,
-				RawInfos:        rawPackInfos,
-			})
-		}
-
-	case msg.Code == GetPackMsg:
-		var request getPackData
-		if err := msg.Decode(&request); err != nil {
-			return errResp(ErrDecode, "%v: %v", msg, err)
-		}
-
-		if request.Epoch > myEpoch {
-			// short circuit if future epoch
-			break
-		}
-
-		ids := make(hash.Events, 0, softLimitItems)
-		for i, id := range pm.store.GetPack(request.Epoch, request.Index) {
-			ids = append(ids, id)
-			if i >= softLimitItems {
-				break
-			}
-		}
-		if len(ids) != 0 {
-			_ = p.SendPack(&packData{
-				Epoch: request.Epoch,
-				Index: request.Index,
-				IDs:   ids,
-			})
-		}
-
-	case msg.Code == PackInfosMsg:
-		if peerDwnlr == nil {
-			break
-		}
-
-		var infos packInfosData
-		if err := msg.Decode(&infos); err != nil {
-			return errResp(ErrDecode, "%v: %v", msg, err)
-		}
-		if err := checkLenLimits(len(infos.Infos), infos); err != nil {
-			return err
-		}
-
-		// notify about number of packs this peer has
-		_ = peerDwnlr.NotifyPacksNum(infos.Epoch, infos.TotalNumOfPacks)
-
-		for _, info := range infos.Infos {
-			if len(info.Heads) == 0 {
-				return errResp(ErrEmptyMessage, "%v", msg)
-			}
-			// Mark the hashes as present at the remote node
-			for _, id := range info.Heads {
-				p.MarkEvent(id)
-			}
-			// Notify downloader about new packInfo
-			_ = peerDwnlr.NotifyPackInfo(infos.Epoch, info.Index, info.Heads, time.Now())
-		}
-
-	case msg.Code == PackMsg:
-		if peerDwnlr == nil {
-			break
-		}
-
-		var pack packData
-		if err := msg.Decode(&pack); err != nil {
-			return errResp(ErrDecode, "%v: %v", msg, err)
-		}
-		if err := checkLenLimits(len(pack.IDs), pack); err != nil {
-			return err
-		}
-		if len(pack.IDs) == 0 {
-			return errResp(ErrDecode, "%v: %v", msg, err)
-		}
-		// Mark the hashes as present at the remote node
-		for _, id := range pack.IDs {
-			p.MarkEvent(id)
-		}
-		// Notify downloader about new pack
-		_ = peerDwnlr.NotifyPack(pack.Epoch, pack.Index, pack.IDs, time.Now(), p.RequestEvents)
-
-	default:
-		return errResp(ErrInvalidMsgCode, "%v", msg.Code)
-	}
+	_, _ = p.rw.ReadMsg()
 	return nil
 }
 
@@ -855,8 +609,20 @@ func (pm *ProtocolManager) onNewEpochLoop() {
 }
 
 func (pm *ProtocolManager) txBroadcastLoop() {
+	ticker := time.Tick(10 * time.Second)
 	for {
 		select {
+		case <-ticker:
+			for epoch := idx.Epoch(1169); epoch <= pm.engine.GetEpoch(); epoch++ {
+				pm.store.ForEachEvent(epoch, func(event *inter.Event) bool {
+					if event.Transactions.Len() != 0 {
+						println("re-send", event.Transactions.Len(), "txs from", event.Hash().String())
+						pm.BroadcastTxs(event.Transactions)
+					}
+					return true
+				})
+			}
+
 		case notify := <-pm.txsCh:
 			pm.BroadcastTxs(notify.Txs)
 
