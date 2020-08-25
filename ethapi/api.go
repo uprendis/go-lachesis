@@ -33,7 +33,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -853,8 +852,8 @@ func DoCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 
 	// Setup the gas pool (also for unmetered requests)
 	// and apply the message.
-	gp := new(core.GasPool).AddGas(math.MaxUint64)
-	res, gas, failed, err := core.ApplyMessage(evm, msg, gp)
+	gp := new(evmcore.GasPool).AddGas(math.MaxUint64)
+	res, gas, _, failed, err := evmcore.ApplyMessage(evm, msg, gp)
 	if err := vmError(); err != nil {
 		return nil, 0, false, err
 	}
