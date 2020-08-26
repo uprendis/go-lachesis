@@ -118,7 +118,7 @@ func NewStateTransition(evm VMI, msg Message, gp *GasPool) *StateTransition {
 		gasPrice: msg.GasPrice(),
 		value:    msg.Value(),
 		data:     msg.Data(),
-		state:    evm.StateDB(),
+		state:    evm.GetStateDB(),
 	}
 }
 

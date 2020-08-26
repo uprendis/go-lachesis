@@ -128,11 +128,9 @@ func ApplyTransaction(
 		}
 	}
 
-	// Create a new context to be used in the EVM environment
-	context := NewEVMContext(msg, header, bc, author)
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
-	vmenv := vm.NewEVM(context, statedb, config, cfg)
+	vmenv := NewDefaultVM(msg, header, bc, statedb)
 	// Apply the transaction to the current state (included in the env)
 	_, gas, fee, failed, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
@@ -154,7 +152,7 @@ func ApplyTransaction(
 	receipt.GasUsed = gas
 	// if the transaction created a contract, store the creation address in the receipt.
 	if msg.To() == nil {
-		receipt.ContractAddress = crypto.CreateAddress(vmenv.Context.Origin, tx.Nonce())
+		receipt.ContractAddress = crypto.CreateAddress(vmenv.ContractCreation(), tx.Nonce())
 	}
 	// Set the receipt logs
 	receipt.Logs = statedb.GetLogs(tx.Hash())
