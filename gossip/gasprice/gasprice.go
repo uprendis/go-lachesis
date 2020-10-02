@@ -14,18 +14,18 @@ import (
 	"github.com/Fantom-foundation/go-lachesis/evmcore"
 )
 
-var maxPrice = big.NewInt(500 * params.GWei)
+var maxPrice = big.NewInt(1000000000 * params.GWei)
 
 type Config struct {
 	Blocks     int
 	Percentile int
-	Default    *big.Int `toml:",omitempty"`
 }
 
 type Reader interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*evmcore.EvmHeader, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*evmcore.EvmBlock, error)
 	ChainConfig() *params.ChainConfig
+	MinGasPrice() *big.Int
 }
 
 // Oracle recommends gas prices based on the content of recent
@@ -56,7 +56,7 @@ func NewOracle(backend Reader, params Config) *Oracle {
 	}
 	return &Oracle{
 		backend:     backend,
-		lastPrice:   params.Default,
+		lastPrice:   backend.MinGasPrice(),
 		checkBlocks: blocks,
 		maxEmpty:    blocks / 2,
 		maxBlocks:   blocks * 5,
@@ -129,6 +129,10 @@ func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	}
 	if price.Cmp(maxPrice) > 0 {
 		price = new(big.Int).Set(maxPrice)
+	}
+	minimum := gpo.backend.MinGasPrice()
+	if price.Cmp(minimum) < 0 {
+		price = minimum
 	}
 
 	gpo.cacheLock.Lock()
