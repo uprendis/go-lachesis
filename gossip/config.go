@@ -134,8 +134,8 @@ func DefaultConfig(network lachesis.Config) Config {
 // DefaultStoreConfig for product.
 func DefaultStoreConfig() StoreConfig {
 	return StoreConfig{
-		EventsCacheSize:        300,
-		EventsHeadersCacheSize: 1000,
+		EventsCacheSize:        500,
+		EventsHeadersCacheSize: 10000,
 		BlockCacheSize:         100,
 		PackInfosCacheSize:     100,
 		TxPositionsCacheSize:   1000,
